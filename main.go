@@ -38,10 +38,12 @@ import (
 
 	clientv1beta1 "github.com/openstack-k8s-operators/infra-operator/apis/client/v1beta1"
 	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
+	networkv1 "github.com/openstack-k8s-operators/infra-operator/apis/network/v1beta1"
 	rabbitmqv1beta1 "github.com/openstack-k8s-operators/infra-operator/apis/rabbitmq/v1beta1"
 	redisv1beta1 "github.com/openstack-k8s-operators/infra-operator/apis/redis/v1beta1"
 	clientcontrollers "github.com/openstack-k8s-operators/infra-operator/controllers/client"
 	memcachedcontrollers "github.com/openstack-k8s-operators/infra-operator/controllers/memcached"
+	networkcontrollers "github.com/openstack-k8s-operators/infra-operator/controllers/network"
 	rabbitmqcontrollers "github.com/openstack-k8s-operators/infra-operator/controllers/rabbitmq"
 	rediscontrollers "github.com/openstack-k8s-operators/infra-operator/controllers/redis"
 	//+kubebuilder:scaffold:imports
@@ -61,6 +63,7 @@ func init() {
 	utilruntime.Must(keystonev1.AddToScheme(scheme))
 	utilruntime.Must(memcachedv1.AddToScheme(scheme))
 	utilruntime.Must(redisv1beta1.AddToScheme(scheme))
+	utilruntime.Must(networkv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -150,6 +153,15 @@ func main() {
 		Scheme:  mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Redis")
+		os.Exit(1)
+	}
+	if err = (&networkcontrollers.DNSMasqReconciler{
+		Client:  mgr.GetClient(),
+		Kclient: kclient,
+		Log:     ctrl.Log.WithName("controllers").WithName("DNSMasq"),
+		Scheme:  mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "DNSMasq")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

@@ -6,6 +6,7 @@ resources:
 - bases/client.openstack.org_openstackclients.yaml
 - bases/memcached.openstack.org_memcacheds.yaml
 - bases/redis.openstack.org_redises.yaml
+- bases/network.openstack.org_dnsmasqs.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

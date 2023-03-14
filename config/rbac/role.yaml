@@ -134,6 +134,32 @@ rules:
   - patch
   - update
 - apiGroups:
+  - network.openstack.org
+  resources:
+  - dnsmasqs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - network.openstack.org
+  resources:
+  - dnsmasqs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - network.openstack.org
+  resources:
+  - dnsmasqs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - rabbitmq.com
   resources:
   - rabbitmqclusters
