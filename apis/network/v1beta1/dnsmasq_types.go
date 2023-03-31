@@ -22,6 +22,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// AnnotationHostnameKey -
+	AnnotationHostnameKey = "dnsmasq.network.openstack.org/hostname"
+)
+
 // DNSMasqSpec defines the desired state of DNSMasq
 type DNSMasqSpec struct {
 	// +kubebuilder:validation:Optional
@@ -34,11 +39,6 @@ type DNSMasqSpec struct {
 	// +kubebuilder:default=1
 	// Replicas - DNSMasq Replicas
 	Replicas int32 `json:"replicas"`
-
-	// +kubebuilder:validation:Required
-	// ConfigMap containing data for dns resolution mounted to /etc/dnsmasq.d inside the deployment.
-	// TODO: expected data
-	DNSData string `json:"dnsData"`
 
 	// +kubebuilder:validation:Optional
 	// Debug - enable debug for different deploy stages. If an init container is used, it runs and the

@@ -59,10 +59,6 @@ spec:
                     description: Service enable debug
                     type: boolean
                 type: object
-              dnsData:
-                description: 'ConfigMap containing data for dns resolution mounted
-                  to /etc/dnsmasq.d inside the deployment. TODO: expected data'
-                type: string
               externalEndpoints:
                 description: ExternalEndpoints, expose a VIP using a pre-created IPAddressPool
                 items:
@@ -114,8 +110,6 @@ spec:
                 description: Replicas - DNSMasq Replicas
                 format: int32
                 type: integer
-            required:
-            - dnsData
             type: object
           status:
             description: DNSMasqStatus defines the observed state of DNSMasq

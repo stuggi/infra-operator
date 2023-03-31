@@ -5,4 +5,6 @@ resources:
 - memcached_v1beta1_memcached.yaml
 - redis_v1beta1_redis.yaml
 - network_v1beta1_dnsmasq.yaml
+- network_v1_dnsdata.yaml
+- network_v1beta1_dnsdata.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

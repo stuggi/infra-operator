@@ -9,4 +9,8 @@ metadata:
     app.kubernetes.io/created-by: infra-operator
   name: dnsmasq-sample
 spec:
-  # TODO(user): Add fields here
+  containerImage: quay.io/tripleozedcentos9/openstack-neutron-server:current-tripleo
+  replicas: 1  
+  dnsData: data-cm
+  debug:
+    service: false

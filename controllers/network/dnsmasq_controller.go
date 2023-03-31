@@ -71,7 +71,7 @@ type DNSMasqReconciler struct {
 func (r *DNSMasqReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, _err error) {
 	_ = log.FromContext(ctx)
 
-	// Fetch the KeystoneAPI instance
+	// Fetch the DNSMasq instance
 	instance := &networkv1.DNSMasq{}
 	err := r.Client.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
@@ -175,7 +175,7 @@ func (r *DNSMasqReconciler) reconcileNormal(ctx context.Context, instance *netwo
 	// check for required configmap instance.Spec.DNSData holding data for the dns service
 	//
 	configMapVars := make(map[string]env.Setter)
-	data, hash, err := configmap.GetConfigMapAndHashWithName(ctx, helper, instance.Spec.DNSData, instance.Namespace)
+	data, hash, err := configmap.GetConfigMapAndHashWithName(ctx, helper, "test", instance.Namespace)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
 			instance.Status.Conditions.Set(condition.FalseCondition(
@@ -183,7 +183,7 @@ func (r *DNSMasqReconciler) reconcileNormal(ctx context.Context, instance *netwo
 				condition.RequestedReason,
 				condition.SeverityInfo,
 				condition.InputReadyWaitingMessage))
-			return ctrl.Result{RequeueAfter: time.Second * 10}, fmt.Errorf("dnsmasq data config map %s not found", instance.Spec.DNSData)
+			return ctrl.Result{RequeueAfter: time.Second * 10}, fmt.Errorf("dnsmasq data config map %s not found", "Test")
 		}
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.InputReadyCondition,

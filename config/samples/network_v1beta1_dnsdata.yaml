@@ -1,0 +1,12 @@
+apiVersion: network.openstack.org/v1beta1
+kind: DNSData
+metadata:
+  labels:
+    app.kubernetes.io/name: dnsdata
+    app.kubernetes.io/instance: dnsdata-sample
+    app.kubernetes.io/part-of: infra-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: infra-operator
+  name: dnsdata-sample
+spec:
+  # TODO(user): Add fields here
