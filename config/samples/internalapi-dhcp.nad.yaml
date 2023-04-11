@@ -1,0 +1,27 @@
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  creationTimestamp: "2023-04-06T12:12:23Z"
+  generation: 2
+  name: internalapi-dhcp
+  namespace: openstack
+  ownerReferences:
+  - apiVersion: operator.openshift.io/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Network
+    name: cluster
+    uid: 792f9bf7-c4f7-469d-9bbc-bce5357ffb73
+  resourceVersion: "5428191"
+  uid: 9864f50e-ed06-4351-81d8-530401e1cd55
+spec:
+  config: |-
+    {
+      "name": "internalapi-dhcp",
+      "cniVersion": "0.3.1",
+      "type": "macvlan",
+      "master": "enp6s0.20",
+      "ipam": {
+        "type": "dhcp"
+      }
+    }

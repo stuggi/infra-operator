@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[{"name":"internalapi-dhcp","namespace":"openstack","interface":"internalapi"},{"name":"storage-dhcp","namespace":"openstack","interface":"storage"}]'
+  name: test
+  namespace: openstack
+spec:
+  containers:
+  - command:
+    - sleep
+    - "3600"
+    image: busybox
+    name: busybox
+  dnsConfig:
+    nameservers:
+    - 172.17.0.30
+  dnsPolicy: None
