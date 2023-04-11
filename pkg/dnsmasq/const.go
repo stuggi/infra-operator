@@ -23,4 +23,7 @@ const (
 
 	// DNSPort -
 	DNSPort int32 = 53
+
+	// CustomServiceConfigFileName -
+	CustomServiceConfigFileName = "zzz-custom.conf"
 )

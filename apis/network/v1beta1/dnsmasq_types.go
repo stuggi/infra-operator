@@ -52,8 +52,34 @@ type DNSMasqSpec struct {
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
 	// +kubebuilder:validation:Optional
+	// NetworkAttachments is a list of NetworkAttachment resource names to expose the services to the given network
+	NetworkAttachments []string `json:"networkAttachments,omitempty"`
+
+	// +kubebuilder:validation:Optional
 	// ExternalEndpoints, expose a VIP using a pre-created IPAddressPool
 	ExternalEndpoints []MetalLBConfig `json:"externalEndpoints,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// DHCPRanges - enable the integrated DHCP server on the range of addresses available for lease and optionally
+	// a lease time. For each network which DHCP needs to be provided a range config is required.
+	// service.
+	DHCPRanges []DHCPRange `json:"dhcpRanges,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// CustomServiceConfig - customize the service config using this parameter. The content gets added to
+	// to the /etc/dnsmasq.d directory as zzz-custom.conf file.
+	CustomServiceConfig string `json:"customServiceConfig,omitempty"`
+}
+
+// DHCPRange -
+type DHCPRange struct {
+	// +kubebuilder:validation:Required
+	// Start address of the range for the DHCP service
+	Start string `json:"start"`
+
+	// +kubebuilder:validation:Required
+	// End address of the range for the DHCP service
+	End string `json:"end"`
 }
 
 // MetalLBConfig to configure the MetalLB loadbalancer service
@@ -102,10 +128,14 @@ type DNSMasqStatus struct {
 
 	// ReadyCount of dnsmasq deployment
 	ReadyCount int32 `json:"readyCount,omitempty"`
+
+	// NetworkAttachments status of the deployment pods
+	NetworkAttachments map[string][]string `json:"networkAttachments,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="NetworkAttachments",type="string",JSONPath=".spec.networkAttachments",description="NetworkAttachments"
 //+kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[0].status",description="Ready"
 //+kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.conditions[0].message",description="Message"
 

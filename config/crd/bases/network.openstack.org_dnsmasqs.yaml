@@ -16,6 +16,10 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - description: NetworkAttachments
+      jsonPath: .spec.networkAttachments
+      name: NetworkAttachments
+      type: string
     - description: Ready
       jsonPath: .status.conditions[0].status
       name: Ready
@@ -49,6 +53,11 @@ spec:
                 description: DNSMasq Container Image URL TODO create its own container
                   image
                 type: string
+              customServiceConfig:
+                description: CustomServiceConfig - customize the service config using
+                  this parameter. The content gets added to to the /etc/dnsmasq.d
+                  directory as zzz-custom.conf file.
+                type: string
               debug:
                 description: Debug - enable debug for different deploy stages. If
                   an init container is used, it runs and the actual action pod gets
@@ -59,6 +68,25 @@ spec:
                     description: Service enable debug
                     type: boolean
                 type: object
+              dhcpRanges:
+                description: DHCPRanges - enable the integrated DHCP server on the
+                  range of addresses available for lease and optionally a lease time.
+                  For each network which DHCP needs to be provided a range config
+                  is required. service.
+                items:
+                  description: DHCPRange -
+                  properties:
+                    end:
+                      description: End address of the range for the DHCP service
+                      type: string
+                    start:
+                      description: Start address of the range for the DHCP service
+                      type: string
+                  required:
+                  - end
+                  - start
+                  type: object
+                type: array
               externalEndpoints:
                 description: ExternalEndpoints, expose a VIP using a pre-created IPAddressPool
                 items:
@@ -97,6 +125,12 @@ spec:
                   - ipAddressPool
                   - network
                   type: object
+                type: array
+              networkAttachments:
+                description: NetworkAttachments is a list of NetworkAttachment resource
+                  names to expose the services to the given network
+                items:
+                  type: string
                 type: array
               nodeSelector:
                 additionalProperties:
@@ -161,6 +195,13 @@ spec:
                 additionalProperties:
                   type: string
                 description: Map of hashes to track e.g. job status
+                type: object
+              networkAttachments:
+                additionalProperties:
+                  items:
+                    type: string
+                  type: array
+                description: NetworkAttachments status of the deployment pods
                 type: object
               readyCount:
                 description: ReadyCount of dnsmasq deployment

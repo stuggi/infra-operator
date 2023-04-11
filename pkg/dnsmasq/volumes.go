@@ -30,6 +30,17 @@ func getVolumes(name string) []corev1.Volume {
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					DefaultMode: &config0644AccessMode,
 					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "test",
+					},
+				},
+			},
+		},
+		{
+			Name: "config",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					DefaultMode: &config0644AccessMode,
+					LocalObjectReference: corev1.LocalObjectReference{
 						Name: name,
 					},
 				},
@@ -43,7 +54,12 @@ func getVolumeMounts() []corev1.VolumeMount {
 	return []corev1.VolumeMount{
 		{
 			Name:      "data",
-			MountPath: "/etc/dnsmasq.d",
+			MountPath: "/etc/dnsmasq.data",
+			ReadOnly:  true,
+		},
+		{
+			Name:      "config",
+			MountPath: "/etc/dnsmasq.cfg",
 			ReadOnly:  true,
 		},
 	}

@@ -59,9 +59,10 @@ type DNSDataReconciler struct {
 }
 
 type hostData struct {
-	name       string
-	addresses  []string
-	ptrRecords []string
+	name        string
+	addresses   []string
+	ptrRecords  []string
+	dhcpRecords []string
 }
 
 const hexDigit = "0123456789abcdef"
@@ -199,22 +200,27 @@ func (r *DNSDataReconciler) reconcileNormal(ctx context.Context, instance *netwo
 
 	// ...
 
+	hostAddrMap["test"] = []net.IP{
+		net.ParseIP("172.17.0.88"),
+		net.ParseIP("172.18.0.88"),
+	}
+
 	// create dnsData configmap
 	for hostname, addrs := range hostAddrMap {
 		addresses := []string{}
 		ptrRecords := []string{}
+		dhcpRecords := []string{}
 		for _, ip := range addrs {
-			r.Log.Info(fmt.Sprintf("booo %+v", dnsmasqAddressEntry(hostname, ip)))
 			addresses = append(addresses, dnsmasqAddressEntry(hostname, ip))
-			r.Log.Info(fmt.Sprintf("booo %+v", addresses))
-
 			ptrRecords = append(ptrRecords, dnsmasqPTRRecord(hostname, ip))
+			dhcpRecords = append(dhcpRecords, dnsmasqDHCPHost(hostname, ip))
 		}
 
 		dnsData[hostname] = hostData{
-			name:       hostname,
-			addresses:  addresses,
-			ptrRecords: ptrRecords,
+			name:        hostname,
+			addresses:   addresses,
+			ptrRecords:  ptrRecords,
+			dhcpRecords: dhcpRecords,
 		}
 	}
 	r.Log.Info(fmt.Sprintf("booo dnsData %+v", dnsData))
@@ -228,7 +234,8 @@ func (r *DNSDataReconciler) reconcileNormal(ctx context.Context, instance *netwo
 
 		for _, hostname := range hostNames {
 			hostdata := strings.Join(dnsData[hostname].addresses, "\n") + "\n" +
-				strings.Join(dnsData[hostname].ptrRecords, "\n")
+				strings.Join(dnsData[hostname].ptrRecords, "\n") + "\n" +
+				strings.Join(dnsData[hostname].dhcpRecords, "\n")
 			configMapData[hostname] = hostdata
 		}
 	}
@@ -332,8 +339,6 @@ func reverseaddr(ip net.IP) string {
 			strconv.FormatUint(uint64(ip[14]), 10) + "." +
 			strconv.FormatUint(uint64(ip[13]), 10) + "." +
 			strconv.FormatUint(uint64(ip[12]), 10)
-
-		//return itoa.Uitoa(uint(ip[15])) + "." + itoa.Uitoa(uint(ip[14])) + "." + itoa.Uitoa(uint(ip[13])) + "." + itoa.Uitoa(uint(ip[12])), nil
 	}
 	// Must be IPv6
 	buf := make([]byte, 0, len(ip)*4)
@@ -362,7 +367,15 @@ func dnsmasqPTRRecord(
 	hostname string,
 	ip net.IP,
 ) string {
-	return fmt.Sprintf("ptr-record==/%s/%s", reverseaddr(ip), hostname)
+	return fmt.Sprintf("ptr-record=/%s/%s", reverseaddr(ip), hostname)
+}
+
+// dnsmasqDHCPHost -
+func dnsmasqDHCPHost(
+	hostname string,
+	ip net.IP,
+) string {
+	return fmt.Sprintf("dhcp-host=%s,%s,infinite", hostname, ip.String())
 }
 
 // MergeIPMaps - merge two or more maps

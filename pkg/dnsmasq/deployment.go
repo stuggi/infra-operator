@@ -16,7 +16,6 @@ limitations under the License.
 package dnsmasq
 
 import (
-	"strconv"
 	"strings"
 
 	networkv1 "github.com/openstack-k8s-operators/infra-operator/apis/network/v1beta1"
@@ -46,6 +45,7 @@ func Deployment(
 	annotations map[string]string,
 ) *appsv1.Deployment {
 	runAsUser := int64(0)
+	privileged := true
 
 	livenessProbe := &corev1.Probe{
 		// TODO might need tuning
@@ -65,6 +65,7 @@ func Deployment(
 	initArgs := []string{"-c"}
 	if instance.Spec.Debug.Service {
 		args = append(args, DebugCommand)
+		initArgs = append(initArgs, "/bin/true")
 
 		livenessProbe.Exec = &corev1.ExecAction{
 			Command: []string{
@@ -79,11 +80,13 @@ func Deployment(
 		}
 	} else {
 		dnsmasqCmd := []string{ServiceCommand}
+		dnsmasqCmd = append(dnsmasqCmd, "--interface=*")
 		dnsmasqCmd = append(dnsmasqCmd, "--no-dhcp-interface=eth0")
-		dnsmasqCmd = append(dnsmasqCmd, "--bind-interfaces")
-		dnsmasqCmd = append(dnsmasqCmd, "--listen-address=$(POD_IP)")
+		//dnsmasqCmd = append(dnsmasqCmd, "--bind-interfaces")
+		//dnsmasqCmd = append(dnsmasqCmd, "--listen-address=$(POD_IP)")
 		dnsmasqCmd = append(dnsmasqCmd, "--no-hosts")
-		dnsmasqCmd = append(dnsmasqCmd, "--hostsdir=/etc/dnsmasq.d/")
+		dnsmasqCmd = append(dnsmasqCmd, "--conf-dir=/etc/dnsmasq.cfg/")
+		dnsmasqCmd = append(dnsmasqCmd, "--conf-dir=/etc/dnsmasq.data/")
 		dnsmasqCmd = append(dnsmasqCmd, "--domain-needed")
 		dnsmasqCmd = append(dnsmasqCmd, "--no-resolv")
 		dnsmasqCmd = append(dnsmasqCmd, "--bogus-priv")
@@ -92,8 +95,8 @@ func Deployment(
 		// log to stdout
 		dnsmasqCmd = append(dnsmasqCmd, "--log-facility=-")
 		dnsmasqCmd = append(dnsmasqCmd, "--keep-in-foreground")
-		//dnsmasqCmd = append(dnsmasqCmd, "--no-daemon")
-		dnsmasqCmd = append(dnsmasqCmd, "--port "+strconv.Itoa(int(DNSPort)))
+		dnsmasqCmd = append(dnsmasqCmd, "--no-daemon")
+		//dnsmasqCmd = append(dnsmasqCmd, "--port "+strconv.Itoa(int(DNSPort)))
 
 		args = append(args, strings.Join(dnsmasqCmd, " "))
 
@@ -133,7 +136,7 @@ func Deployment(
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: ServiceAccount,
-					Volumes:            getVolumes("TODO"),
+					Volumes:            getVolumes(instance.Name),
 					//Volumes:            getVolumes(instance.Spec.DNSData),
 					InitContainers: []corev1.Container{
 						{
@@ -155,7 +158,12 @@ func Deployment(
 							Args:    args,
 							Image:   instance.Spec.ContainerImage,
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: &runAsUser,
+								Capabilities: &corev1.Capabilities{
+									Add:  []corev1.Capability{"NET_ADMIN", "SYS_ADMIN", "SYS_NICE"},
+									Drop: []corev1.Capability{},
+								},
+								RunAsUser:  &runAsUser,
+								Privileged: &privileged,
 							},
 							Env:            env.MergeEnvs([]corev1.EnvVar{}, envVars),
 							VolumeMounts:   getVolumeMounts(),

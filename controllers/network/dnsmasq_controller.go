@@ -19,6 +19,8 @@ package network
 import (
 	"context"
 	"fmt"
+	"net"
+	"strings"
 	"time"
 
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -46,6 +48,8 @@ import (
 	endpoint "github.com/openstack-k8s-operators/lib-common/modules/common/endpoint"
 	env "github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	helper "github.com/openstack-k8s-operators/lib-common/modules/common/helper"
+	labels "github.com/openstack-k8s-operators/lib-common/modules/common/labels"
+	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
 	util "github.com/openstack-k8s-operators/lib-common/modules/common/util"
 )
 
@@ -62,6 +66,7 @@ type DNSMasqReconciler struct {
 //+kubebuilder:rbac:groups=network.openstack.org,resources=dnsmasqs/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete;
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete;
+//+kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -169,7 +174,34 @@ func (r *DNSMasqReconciler) reconcileNormal(ctx context.Context, instance *netwo
 		common.AppSelector: dnsmasq.ServiceName,
 	}
 
-	serviceAnnotations := map[string]string{}
+	// networks to attach to
+	for _, netAtt := range instance.Spec.NetworkAttachments {
+		_, err := nad.GetNADWithName(ctx, helper, netAtt, instance.Namespace)
+		if err != nil {
+			if k8s_errors.IsNotFound(err) {
+				instance.Status.Conditions.Set(condition.FalseCondition(
+					condition.NetworkAttachmentsReadyCondition,
+					condition.RequestedReason,
+					condition.SeverityInfo,
+					condition.NetworkAttachmentsReadyWaitingMessage,
+					netAtt))
+				return ctrl.Result{RequeueAfter: time.Second * 10}, fmt.Errorf("network-attachment-definition %s not found", netAtt)
+			}
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.NetworkAttachmentsReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.NetworkAttachmentsReadyErrorMessage,
+				err.Error()))
+			return ctrl.Result{}, err
+		}
+	}
+
+	serviceAnnotations, err := nad.CreateNetworksAnnotation(instance.Namespace, instance.Spec.NetworkAttachments)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed create network annotation from %s: %w",
+			instance.Spec.NetworkAttachments, err)
+	}
 
 	//
 	// check for required configmap instance.Spec.DNSData holding data for the dns service
@@ -197,33 +229,20 @@ func (r *DNSMasqReconciler) reconcileNormal(ctx context.Context, instance *netwo
 
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 
-	/*
-		// ConfigMap
-		templateParameters := make(map[string]interface{})
-		cms := []util.Template{
-			{
-				Name:          fmt.Sprintf("%s-data", instance.Name),
-				Namespace:     instance.Namespace,
-				Type:          util.TemplateTypeConfig,
-				InstanceType:  instance.Kind,
-				ConfigOptions: templateParameters,
-				Labels:        serviceLabels,
-			},
-		}
+	//
+	// create Configmap for dnsmasq input
+	//
+	err = r.generateServiceConfigMaps(ctx, helper, instance, &configMapVars)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ServiceConfigReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.ServiceConfigReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
 
-		// create configmap holding dns host files
-		err := configmap.EnsureConfigMaps(ctx, helper, instance, cms, &configMapVars)
-		if err != nil {
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.InputReadyCondition,
-				condition.ErrorReason,
-				condition.SeverityWarning,
-				condition.InputReadyErrorMessage,
-				err.Error()))
-			return ctrl.Result{}, err
-		}
-		instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
-	*/
 	//
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
@@ -293,7 +312,7 @@ func (r *DNSMasqReconciler) reconcileNormal(ctx context.Context, instance *netwo
 	instance.Status.Conditions.MarkTrue(condition.ExposeServiceReadyCondition, condition.ExposeServiceReadyMessage)
 
 	// Define a new Deployment object
-	deplDef := dnsmasq.Deployment(instance, instance.Status.Hash[fmt.Sprintf("%s-data", instance.Name)], serviceLabels, serviceAnnotations)
+	deplDef := dnsmasq.Deployment(instance, instance.Status.Hash[common.InputHashName], serviceLabels, serviceAnnotations)
 	depl := deployment.NewDeployment(
 		deplDef,
 		time.Duration(5)*time.Second,
@@ -317,6 +336,27 @@ func (r *DNSMasqReconciler) reconcileNormal(ctx context.Context, instance *netwo
 		return ctrlResult, nil
 	}
 	instance.Status.ReadyCount = depl.GetDeployment().Status.ReadyReplicas
+
+	// verify if network attachment matches expectations
+	networkReady, networkAttachmentStatus, err := nad.VerifyNetworkStatusFromAnnotation(ctx, helper, instance.Spec.NetworkAttachments, serviceLabels, instance.Status.ReadyCount)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	instance.Status.NetworkAttachments = networkAttachmentStatus
+	if networkReady {
+		instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
+	} else {
+		err := fmt.Errorf("not all pods have interfaces with ips as configured in NetworkAttachments: %s", instance.Spec.NetworkAttachments)
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.NetworkAttachmentsReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.NetworkAttachmentsReadyErrorMessage,
+			err.Error()))
+
+		return ctrl.Result{}, err
+	}
 
 	if instance.Status.ReadyCount > 0 {
 		instance.Status.Conditions.MarkTrue(condition.DeploymentReadyCondition, condition.DeploymentReadyMessage)
@@ -348,4 +388,66 @@ func (r *DNSMasqReconciler) createHashOfInputHashes(
 		r.Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
 	}
 	return hash, changed, nil
+}
+
+// generateServiceConfigMaps - create create configmaps which hold service configuration
+func (r *DNSMasqReconciler) generateServiceConfigMaps(
+	ctx context.Context,
+	h *helper.Helper,
+	instance *networkv1.DNSMasq,
+	envVars *map[string]env.Setter,
+) error {
+	//
+	// create Configmap/Secret required for placement input
+	// - %-scripts configmap holding scripts to e.g. bootstrap the service
+	// - %-config configmap holding minimal placement config required to get the service up, user can add additional files to be added to the service
+	// - parameters which has passwords gets added from the ospSecret via the init container
+	//
+
+	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(dnsmasq.ServiceName), map[string]string{})
+
+	// DHCPRange - enable the integrated DHCP server on the range of addresses available for lease and optionally
+	// a lease time. For each network which DHCP needs to be provided a range config is required.
+	// service.
+
+	configMapData := map[string]string{}
+	if instance.Spec.DHCPRanges != nil {
+
+		for _, dhcpRange := range instance.Spec.DHCPRanges {
+			start := net.ParseIP(dhcpRange.Start)
+			if start == nil {
+				return fmt.Errorf(fmt.Sprintf("unrecognized address %s", start))
+			}
+			end := net.ParseIP(dhcpRange.End)
+			if end == nil {
+				return fmt.Errorf(fmt.Sprintf("unrecognized address %s", end))
+			}
+			configMapData[dnsmasq.CustomServiceConfigFileName] = configMapData[dnsmasq.CustomServiceConfigFileName] + "\n" +
+				dnsmasqDHCPRange(start, end)
+		}
+	}
+	if instance.Spec.CustomServiceConfig != "" {
+		configMapData[dnsmasq.CustomServiceConfigFileName] = configMapData[dnsmasq.CustomServiceConfigFileName] + "\n" + instance.Spec.CustomServiceConfig
+	}
+
+	cms := []util.Template{
+		{
+			Name:         strings.ToLower(instance.Name),
+			Namespace:    instance.Namespace,
+			Type:         util.TemplateTypeNone,
+			InstanceType: instance.Kind,
+			CustomData:   configMapData,
+			Labels:       cmLabels,
+		},
+	}
+
+	return configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
+}
+
+// dnsmasqDHCPRange -
+func dnsmasqDHCPRange(
+	start net.IP,
+	end net.IP,
+) string {
+	return fmt.Sprintf("dhcp-range=%s,%s,infinite", start.String(), end.String())
 }
