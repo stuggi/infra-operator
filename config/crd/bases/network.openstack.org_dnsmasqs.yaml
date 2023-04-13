@@ -76,6 +76,9 @@ spec:
                 items:
                   description: DHCPRange -
                   properties:
+                    domain:
+                      description: Domain part of the expmanded host
+                      type: string
                     end:
                       description: End address of the range for the DHCP service
                       type: string
@@ -83,6 +86,7 @@ spec:
                       description: Start address of the range for the DHCP service
                       type: string
                   required:
+                  - domain
                   - end
                   - start
                   type: object

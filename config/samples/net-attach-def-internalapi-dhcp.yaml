@@ -1,0 +1,22 @@
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: internalapi-dhcp
+  namespace: openstack
+spec:
+  config: |-
+    {
+      "name": "internalapi-dhcp",
+      "cniVersion": "0.3.1",
+      "type": "macvlan",
+      "master": "enp6s0.20",
+      "ipam": {
+        "type": "dhcp",
+        "provide": [
+          {
+            "option": "host-name",
+            "fromArg": "K8S_POD_NAME"
+          }
+        ]
+      }
+    }

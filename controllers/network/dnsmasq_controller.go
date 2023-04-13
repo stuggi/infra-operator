@@ -423,7 +423,8 @@ func (r *DNSMasqReconciler) generateServiceConfigMaps(
 				return fmt.Errorf(fmt.Sprintf("unrecognized address %s", end))
 			}
 			configMapData[dnsmasq.CustomServiceConfigFileName] = configMapData[dnsmasq.CustomServiceConfigFileName] + "\n" +
-				dnsmasqDHCPRange(start, end)
+				dnsmasqDHCPRange(start, end) + "\n" +
+				dnsmasqDomain(dhcpRange.Domain, start, end)
 		}
 	}
 	if instance.Spec.CustomServiceConfig != "" {
@@ -450,4 +451,13 @@ func dnsmasqDHCPRange(
 	end net.IP,
 ) string {
 	return fmt.Sprintf("dhcp-range=%s,%s,infinite", start.String(), end.String())
+}
+
+// dnsmasqDomain -
+func dnsmasqDomain(
+	domain string,
+	start net.IP,
+	end net.IP,
+) string {
+	return fmt.Sprintf("domain=%s,%s,%s", domain, start.String(), end.String())
 }

@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-statefulset
+  namespace: openstack
+spec:
+  selector:
+    matchLabels:
+      name: test-statefulset
+  replicas: 2
+  template:
+    metadata:
+      annotations:
+        k8s.v1.cni.cncf.io/networks: '[{"name":"internalapi-dhcp","namespace":"openstack","interface":"internalapi"},{"name":"storage-dhcp","namespace":"openstack","interface":"storage"}]'
+      labels:
+        name: test-statefulset
+    spec:
+      containers:
+      - name: test-container
+        image: busybox
+        command:
+        - sleep
+        - "3600"
+      dnsConfig:
+        nameservers:
+        - 172.17.0.30
+      dnsPolicy: None
+      terminationGracePeriodSeconds: 10

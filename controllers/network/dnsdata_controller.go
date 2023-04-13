@@ -60,9 +60,20 @@ type DNSDataReconciler struct {
 
 type hostData struct {
 	name        string
+	hostrecords []string
 	addresses   []string
 	ptrRecords  []string
 	dhcpRecords []string
+}
+
+type hostRecord struct {
+	hostname  string
+	addresses []networkData
+}
+
+type networkData struct {
+	name      string
+	addresses []net.IP
 }
 
 const hexDigit = "0123456789abcdef"
@@ -177,6 +188,7 @@ func (r *DNSDataReconciler) reconcileDelete(ctx context.Context, instance *netwo
 func (r *DNSDataReconciler) reconcileNormal(ctx context.Context, instance *networkv1.DNSData, helper *helper.Helper) (ctrl.Result, error) {
 	r.Log.Info("Reconciling Service")
 
+	hosts := map[string]hostRecord{}
 	hostAddrMap := map[string][]net.IP{}
 	dnsData := map[string]hostData{}
 	//dnsData := make(map[string]string)
@@ -200,29 +212,96 @@ func (r *DNSDataReconciler) reconcileNormal(ctx context.Context, instance *netwo
 
 	// ...
 
-	hostAddrMap["test"] = []net.IP{
-		net.ParseIP("172.17.0.88"),
-		net.ParseIP("172.18.0.88"),
+	hosts["test"] = hostRecord{
+		hostname: "test",
+		addresses: []networkData{
+			{
+				name: "internalapi",
+				addresses: []net.IP{
+					net.ParseIP("172.17.0.88"),
+				},
+			},
+			{
+				name: "storage",
+				addresses: []net.IP{
+					net.ParseIP("172.18.0.88"),
+				},
+			},
+		},
+	}
+
+	hosts["test-statefulset-0"] = hostRecord{
+		hostname: "test-statefulset-0",
+		addresses: []networkData{
+			{
+				name: "internalapi",
+				addresses: []net.IP{
+					net.ParseIP("172.17.0.100"),
+				},
+			},
+			{
+				name: "storage",
+				addresses: []net.IP{
+					net.ParseIP("172.18.0.100"),
+				},
+			},
+		},
 	}
 
 	// create dnsData configmap
-	for hostname, addrs := range hostAddrMap {
-		addresses := []string{}
-		ptrRecords := []string{}
+	for _, hostRec := range hosts {
 		dhcpRecords := []string{}
-		for _, ip := range addrs {
-			addresses = append(addresses, dnsmasqAddressEntry(hostname, ip))
-			ptrRecords = append(ptrRecords, dnsmasqPTRRecord(hostname, ip))
-			dhcpRecords = append(dhcpRecords, dnsmasqDHCPHost(hostname, ip))
+		hostRecords := []string{}
+		for _, network := range hostRec.addresses {
+			hostname := hostRec.hostname + "." + network.name
+			for _, ip := range network.addresses {
+				hostRecords = append(hostRecords, dnsmasqHostRecord(hostname, ip))
+				dhcpRecords = append(dhcpRecords, dnsmasqDHCPHost(hostRec.hostname, ip))
+			}
 		}
 
-		dnsData[hostname] = hostData{
-			name:        hostname,
-			addresses:   addresses,
-			ptrRecords:  ptrRecords,
+		dnsData[hostRec.hostname] = hostData{
+			name:        hostRec.hostname,
+			hostrecords: hostRecords,
 			dhcpRecords: dhcpRecords,
 		}
 	}
+	/*
+		hostAddrMap["test-statefulset-0"] = []net.IP{
+			net.ParseIP("172.17.0.100"),
+			net.ParseIP("172.18.0.100"),
+		}
+		hostAddrMap["test-statefulset-1"] = []net.IP{
+			net.ParseIP("172.17.0.101"),
+			net.ParseIP("172.18.0.101"),
+		}
+		hostAddrMap["test-statefulset-2"] = []net.IP{
+			net.ParseIP("172.17.0.102"),
+			net.ParseIP("172.18.0.102"),
+		}
+
+		// create dnsData configmap
+		for hostname, addrs := range hostAddrMap {
+			addresses := []string{}
+			ptrRecords := []string{}
+			dhcpRecords := []string{}
+			hostRecords := []string{}
+			for _, ip := range addrs {
+				hostRecords = append(hostRecords, dnsmasqHostRecord(hostname, ip))
+				addresses = append(addresses, dnsmasqAddressEntry(hostname, ip))
+				ptrRecords = append(ptrRecords, dnsmasqPTRRecord(hostname, ip))
+				dhcpRecords = append(dhcpRecords, dnsmasqDHCPHost(hostname, ip))
+			}
+
+			dnsData[hostname] = hostData{
+				name:        hostname,
+				hostrecords: hostRecords,
+				addresses:   addresses,
+				ptrRecords:  ptrRecords,
+				dhcpRecords: dhcpRecords,
+			}
+		}
+	*/
 	r.Log.Info(fmt.Sprintf("booo dnsData %+v", dnsData))
 
 	configMapData := map[string]string{}
@@ -233,10 +312,13 @@ func (r *DNSDataReconciler) reconcileNormal(ctx context.Context, instance *netwo
 		sort.Strings(hostNames)
 
 		for _, hostname := range hostNames {
-			hostdata := strings.Join(dnsData[hostname].addresses, "\n") + "\n" +
-				strings.Join(dnsData[hostname].ptrRecords, "\n") + "\n" +
+			hostdata := strings.Join(dnsData[hostname].hostrecords, "\n") + "\n" +
 				strings.Join(dnsData[hostname].dhcpRecords, "\n")
-			configMapData[hostname] = hostdata
+
+			//hostdata := strings.Join(dnsData[hostname].addresses, "\n") + "\n" +
+			//	strings.Join(dnsData[hostname].ptrRecords, "\n") + "\n" +
+			//	strings.Join(dnsData[hostname].dhcpRecords, "\n")
+			configMapData[hostname] = hostdata + "\n"
 		}
 	}
 
@@ -354,6 +436,14 @@ func reverseaddr(ip net.IP) string {
 	return string(buf)
 }
 
+// dnsmasqHostRecord -
+func dnsmasqHostRecord(
+	hostname string,
+	ip net.IP,
+) string {
+	return fmt.Sprintf("host-record=%s,%s", hostname, ip.String())
+}
+
 // dnsmasqAddressEntry -
 func dnsmasqAddressEntry(
 	hostname string,
@@ -367,7 +457,7 @@ func dnsmasqPTRRecord(
 	hostname string,
 	ip net.IP,
 ) string {
-	return fmt.Sprintf("ptr-record=/%s/%s", reverseaddr(ip), hostname)
+	return fmt.Sprintf("ptr-record=/%s.in-addr.arpa./%s", reverseaddr(ip), hostname)
 }
 
 // dnsmasqDHCPHost -

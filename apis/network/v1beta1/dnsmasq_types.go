@@ -80,6 +80,10 @@ type DHCPRange struct {
 	// +kubebuilder:validation:Required
 	// End address of the range for the DHCP service
 	End string `json:"end"`
+
+	// +kubebuilder:validation:Required
+	// Domain part of the expmanded host
+	Domain string `json:"domain"`
 }
 
 // MetalLBConfig to configure the MetalLB loadbalancer service
