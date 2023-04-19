@@ -42,6 +42,20 @@ rules:
 - apiGroups:
   - apps
   resources:
+  - deployments/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps
+  resources:
+  - deployments/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps
+  resources:
   - statefulsets
   verbs:
   - create
@@ -82,8 +96,12 @@ rules:
   resources:
   - configmaps
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - ""
@@ -146,6 +164,96 @@ rules:
   - memcached.openstack.org
   resources:
   - memcacheds/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - network.openstack.org
+  resources:
+  - dnsdata
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - network.openstack.org
+  resources:
+  - dnsdata/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - network.openstack.org
+  resources:
+  - dnsdata/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - network.openstack.org
+  resources:
+  - dnsdatas
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - network.openstack.org
+  resources:
+  - dnsmasqs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - network.openstack.org
+  resources:
+  - dnsmasqs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - network.openstack.org
+  resources:
+  - dnsmasqs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - network.openstack.org
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - network.openstack.org
+  resources:
+  - services/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - network.openstack.org
+  resources:
+  - services/status
   verbs:
   - get
   - patch
