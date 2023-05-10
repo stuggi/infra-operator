@@ -196,6 +196,174 @@ webhooks:
     scope: '*'
   sideEffects: None
   timeoutSeconds: 10
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: vdnsmasq.kb.io
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: ${CA_BUNDLE}
+    url: https://${CRC_IP}:9443/validate-dnsmasq-openstack-org-v1beta1-dnsmasq
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: vdnsmasq.kb.io
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - network.openstack.org
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - dnsmasqs
+    scope: '*'
+  sideEffects: None
+  timeoutSeconds: 10
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: mdnsmasq.kb.io
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: ${CA_BUNDLE}
+    url: https://${CRC_IP}:9443/mutate-dnsmasq-openstack-org-v1beta1-dnsmasq
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: mdnsmasq.kb.io
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - network.openstack.org
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - dnsmasqs
+    scope: '*'
+  sideEffects: None
+  timeoutSeconds: 10
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: vnetconfig.kb.io
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: ${CA_BUNDLE}
+    url: https://${CRC_IP}:9443/validate-netconfig-openstack-org-v1beta1-netconfig
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: vnetconfig.kb.io
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - network.openstack.org
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - netconfigs
+    scope: '*'
+  sideEffects: None
+  timeoutSeconds: 10
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: mnetconfig.kb.io
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: ${CA_BUNDLE}
+    url: https://${CRC_IP}:9443/mutate-netconfig-openstack-org-v1beta1-netconfig
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: mnetconfig.kb.io
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - network.openstack.org
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - netconfigs
+    scope: '*'
+  sideEffects: None
+  timeoutSeconds: 10
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: vipset.kb.io
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: ${CA_BUNDLE}
+    url: https://${CRC_IP}:9443/validate-netconfig-openstack-org-v1beta1-ipset
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: vipset.kb.io
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - network.openstack.org
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ipsets
+    scope: '*'
+  sideEffects: None
+  timeoutSeconds: 10
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: mipset.kb.io
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    caBundle: ${CA_BUNDLE}
+    url: https://${CRC_IP}:9443/mutate-netconfig-openstack-org-v1beta1-ipset
+  failurePolicy: Fail
+  matchPolicy: Equivalent
+  name: mipset.kb.io
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - network.openstack.org
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ipsets
+    scope: '*'
+  sideEffects: None
+  timeoutSeconds: 10
 EOF_CAT
 
 oc apply -n openstack -f ${TMPDIR}/patch_webhook_configurations.yaml

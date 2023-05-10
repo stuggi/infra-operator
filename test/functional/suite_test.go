@@ -57,7 +57,6 @@ var (
 	cancel    context.CancelFunc
 	logger    logr.Logger
 	th        *TestHelper
-	namespace string
 )
 
 func TestAPIs(t *testing.T) {
@@ -139,6 +138,30 @@ var _ = BeforeSuite(func() {
 		Scheme:  k8sManager.GetScheme(),
 		Kclient: kclient,
 		Log:     ctrl.Log.WithName("controllers").WithName("Service"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&network_ctrl.NetConfigReconciler{
+		Client:  k8sManager.GetClient(),
+		Scheme:  k8sManager.GetScheme(),
+		Kclient: kclient,
+		Log:     ctrl.Log.WithName("controllers").WithName("NetConfig"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&network_ctrl.IPSetReconciler{
+		Client:  k8sManager.GetClient(),
+		Scheme:  k8sManager.GetScheme(),
+		Kclient: kclient,
+		Log:     ctrl.Log.WithName("controllers").WithName("IPSet"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&network_ctrl.ReservationReconciler{
+		Client:  k8sManager.GetClient(),
+		Scheme:  k8sManager.GetScheme(),
+		Kclient: kclient,
+		Log:     ctrl.Log.WithName("controllers").WithName("Reservation"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

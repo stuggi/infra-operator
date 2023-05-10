@@ -38,6 +38,11 @@ const (
 	timeout        = 10 * time.Second
 	interval       = timeout / 100
 	containerImage = "test-dnsmasq-container-image"
+
+	net1    = "net-1"
+	subnet1 = "subnet1"
+	subnet2 = "subnet2"
+	host1   = "host1"
 )
 
 func CreateDNSMasq(namespace string, spec map[string]interface{}) client.Object {
@@ -100,7 +105,7 @@ func GetDefaultDNSDataSpec() map[string]interface{} {
 	spec["dnsDataLabelSelectorValue"] = "someselector"
 	spec["hosts"] = interface{}([]networkv1.DNSHost{
 		{
-			Hostnames: []string{"host1"},
+			Hostnames: []string{host1},
 			IP:        "host-ip-1",
 		},
 		{
@@ -131,6 +136,30 @@ func GetDNSData(name types.NamespacedName) *networkv1.DNSData {
 	return instance
 }
 
+func GetNetConfig(name types.NamespacedName) *networkv1.NetConfig {
+	instance := &networkv1.NetConfig{}
+	Eventually(func(g Gomega) {
+		g.Expect(k8sClient.Get(ctx, name, instance)).Should(Succeed())
+	}, timeout, interval).Should(Succeed())
+	return instance
+}
+
+func GetIPSet(name types.NamespacedName) *networkv1.IPSet {
+	instance := &networkv1.IPSet{}
+	Eventually(func(g Gomega) {
+		g.Expect(k8sClient.Get(ctx, name, instance)).Should(Succeed())
+	}, timeout, interval).Should(Succeed())
+	return instance
+}
+
+func GetReservation(name types.NamespacedName) *networkv1.Reservation {
+	instance := &networkv1.Reservation{}
+	Eventually(func(g Gomega) {
+		g.Expect(k8sClient.Get(ctx, name, instance)).Should(Succeed())
+	}, timeout, interval).Should(Succeed())
+	return instance
+}
+
 func DNSMasqConditionGetter(name types.NamespacedName) condition.Conditions {
 	instance := GetDNSMasq(name)
 	return instance.Status.Conditions
@@ -138,6 +167,16 @@ func DNSMasqConditionGetter(name types.NamespacedName) condition.Conditions {
 
 func DNSDataConditionGetter(name types.NamespacedName) condition.Conditions {
 	instance := GetDNSData(name)
+	return instance.Status.Conditions
+}
+
+func NetConfigConditionGetter(name types.NamespacedName) condition.Conditions {
+	instance := GetDNSMasq(name)
+	return instance.Status.Conditions
+}
+
+func IPSetConditionGetter(name types.NamespacedName) condition.Conditions {
+	instance := GetIPSet(name)
 	return instance.Status.Conditions
 }
 
@@ -211,4 +250,120 @@ func CreateLoadBalancerService(name types.NamespacedName, addDnsAnno bool) *core
 	Expect(k8sClient.Status().Update(ctx, svc)).To(Succeed())
 
 	return svc
+}
+
+func CreateNetConfig(namespace string, spec map[string]interface{}) client.Object {
+	name := uuid.New().String()
+
+	raw := map[string]interface{}{
+		"apiVersion": "network.openstack.org/v1beta1",
+		"kind":       "NetConfig",
+		"metadata": map[string]interface{}{
+			"name":      name,
+			"namespace": namespace,
+		},
+		"spec": spec,
+	}
+
+	return th.CreateUnstructured(raw)
+}
+
+func GetNetConfigSpec(subnet networkv1.Subnet) map[string]interface{} {
+	spec := make(map[string]interface{})
+	net := networkv1.Network{
+		Name:    net1,
+		MTU:     1400,
+		Subnets: []networkv1.Subnet{GetSubnet1()},
+	}
+
+	net.Subnets = append(net.Subnets, subnet)
+
+	spec["networks"] = interface{}([]networkv1.Network{net})
+
+	return spec
+}
+
+func GetDefaultNetConfigSpec() map[string]interface{} {
+	return GetNetConfigSpec(GetSubnet1())
+}
+
+func GetSubnet1() networkv1.Subnet {
+	var gw string = "172.17.0.1"
+	return networkv1.Subnet{
+		Name:    subnet1,
+		Cidr:    "172.17.0.0/24",
+		Vlan:    20,
+		Gateway: &gw,
+		AllocationRanges: []networkv1.AllocationRange{
+			{
+				Start: "172.17.0.100",
+				End:   "172.17.0.200",
+				ExcludeAddresses: []string{
+					"172.17.0.201",
+				},
+			},
+		},
+	}
+}
+
+func GetSubnetWithWrongExcludeAddress() networkv1.Subnet {
+	return networkv1.Subnet{
+		Name: subnet1,
+		Cidr: "172.17.0.0/24",
+		Vlan: 20,
+		AllocationRanges: []networkv1.AllocationRange{
+			{
+				Start: "172.17.0.100",
+				End:   "172.17.0.200",
+				ExcludeAddresses: []string{
+					"172.18.0.201",
+				},
+			},
+		},
+	}
+}
+
+func CreateIPSet(namespace string, spec map[string]interface{}) client.Object {
+	name := uuid.New().String()
+
+	raw := map[string]interface{}{
+		"apiVersion": "network.openstack.org/v1beta1",
+		"kind":       "IPSet",
+		"metadata": map[string]interface{}{
+			"name":      name,
+			"namespace": namespace,
+		},
+		"spec": spec,
+	}
+
+	return th.CreateUnstructured(raw)
+}
+
+func GetIPSetSpec(hostname string, nets ...networkv1.IPSetNetwork) map[string]interface{} {
+	spec := make(map[string]interface{})
+
+	spec["hostname"] = hostname
+	networks := []networkv1.IPSetNetwork{}
+	networks = append(networks, nets...)
+	spec["networks"] = interface{}(networks)
+
+	return spec
+}
+
+func GetDefaultIPSetSpec() map[string]interface{} {
+	return GetIPSetSpec(host1, GetIPSetSubnet1())
+}
+
+func GetIPSetSubnet1() networkv1.IPSetNetwork {
+	return networkv1.IPSetNetwork{
+		Name:       net1,
+		SubnetName: subnet1,
+	}
+}
+
+func GetIPSetSubnet2() networkv1.IPSetNetwork {
+	return networkv1.IPSetNetwork{
+		Name:       net1,
+		SubnetName: subnet2,
+	}
 }
