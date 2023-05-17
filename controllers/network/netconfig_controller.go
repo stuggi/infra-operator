@@ -197,7 +197,6 @@ func (r *NetConfigReconciler) reconcileNormal(
 	r.Log.Info("Reconciling Service")
 
 	r.Log.Info("get all Reservations")
-	// TODO per network and subnet using the labels we set ?
 	// get list of Reservation objects in the namespace
 	reservations := &networkv1.ReservationList{}
 	opts := &client.ListOptions{
@@ -231,31 +230,45 @@ func (r *NetConfigReconciler) reconcileNormal(
 
 	// Iterate over the IPSets to find all addresses and objects
 	for _, ipset := range ipSets.Items {
-		// if the IPSet not yet has a reservation its a request for a new reservation
-		if res, ok := resMapNameIdx[ipset.Name]; !ok {
-			// new ipset, make reservation
-			r.Log.Info(fmt.Sprintf("New reservation reqest for %s", ipset.Name))
-			// generic ensure Reservation?
-			err := r.createReservation(ctx, instance, &ipset, helper, resMapIPIdx)
+		if instance.DeletionTimestamp.IsZero() {
+			err := r.ensureReservation(ctx, instance, &ipset, helper, resMapIPIdx)
 			if err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to create new reservation for %s - %w", ipset.Name, err)
 			}
 
 		} else {
-			// existing reservation, validate it
-			r.Log.Info(fmt.Sprintf("Existing reservation for %s", ipset.Name))
-			for _, ipsetNet := range ipset.Spec.Networks {
-				// if the Network name is not yet in the reservations Network list
-				if netRes, ok := res.Spec.Reservations[string(ipsetNet.Name)]; !ok {
-					r.Log.Info(fmt.Sprintf("New network reservation for %s - %+v", ipset.Name, ipsetNet.Name))
+			// TODO delete reservation
+		}
 
-				} else {
-					r.Log.Info(fmt.Sprintf("Existing network reservation for %s - %+v", ipset.Name, netRes))
-					// TODO: mschuppert do we have to consider subnet changes?
+		/*
+			// if the IPSet not yet has a reservation its a request for a new reservation
+			if res, ok := resMapNameIdx[ipset.Name]; !ok {
 
+				// new ipset, make reservation
+				r.Log.Info(fmt.Sprintf("New reservation reqest for %s", ipset.Name))
+				// generic ensure Reservation?
+				err := r.createReservation(ctx, instance, &ipset, helper, resMapIPIdx)
+				if err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to create new reservation for %s - %w", ipset.Name, err)
+				}
+
+			} else {
+				// existing reservation, validate it
+				r.Log.Info(fmt.Sprintf("Existing reservation for %s", ipset.Name))
+				for _, ipsetNet := range ipset.Spec.Networks {
+					// if the Network name is not yet in the reservations Network list
+					if netRes, ok := res.Spec.Reservations[string(ipsetNet.Name)]; !ok {
+						r.Log.Info(fmt.Sprintf("New network reservation for %s - %+v", ipset.Name, ipsetNet.Name))
+
+					} else {
+						r.Log.Info(fmt.Sprintf("Existing network reservation for %s - %+v", ipset.Name, netRes))
+						// TODO: mschuppert do we have to consider subnet changes?
+
+					}
 				}
 			}
-		}
+		*/
+
 	}
 
 	/*
@@ -277,7 +290,7 @@ func (r *NetConfigReconciler) reconcileNormal(
 	return ctrl.Result{}, nil
 }
 
-func (r *NetConfigReconciler) createReservation(
+func (r *NetConfigReconciler) ensureReservation(
 	ctx context.Context,
 	instance *networkv1.NetConfig,
 	ipset *networkv1.IPSet,
