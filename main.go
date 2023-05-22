@@ -211,6 +211,10 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "DNSMasq")
 			os.Exit(1)
 		}
+		if err = (&networkv1.NetConfig{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "NetConfig")
+			os.Exit(1)
+		}
 	}
 
 	//+kubebuilder:scaffold:builder
