@@ -188,6 +188,15 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Service")
 		os.Exit(1)
 	}
+	if err = (&networkcontrollers.IPSetReconciler{
+		Client:  mgr.GetClient(),
+		Kclient: kclient,
+		Log:     ctrl.Log.WithName("controllers").WithName("IPSet"),
+		Scheme:  mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "IPSet")
+		os.Exit(1)
+	}
 
 	// Acquire environmental defaults and initialize operator defaults with them
 	clientv1beta1.SetupDefaults()
@@ -219,6 +228,10 @@ func main() {
 		}
 		if err = (&networkv1beta1.Reservation{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Reservation")
+			os.Exit(1)
+		}
+		if err = (&networkv1beta1.IPSet{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "IPSet")
 			os.Exit(1)
 		}
 	}

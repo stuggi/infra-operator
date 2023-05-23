@@ -42,8 +42,8 @@ type ReservationSpec struct {
 	IPSetRef corev1.ObjectReference `json:"ipSetRef"`
 
 	// +kubebuilder:validation:Required
-	// Reservations, map (index network name) with reservation
-	Reservations map[string]IPAddress `json:"reservations"`
+	// Reservation, map (index network name) with reservation
+	Reservation map[string]IPAddress `json:"reservation"`
 }
 
 // ReservationStatus defines the observed state of Reservation
@@ -54,7 +54,7 @@ type ReservationStatus struct {
 //+kubebuilder:subresource:status
 //+kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[0].status",description="Ready"
 //+kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.conditions[0].message",description="Message"
-//+kubebuilder:printcolumn:name="Reservation",type="string",JSONPath=".status.reservations",description="Reservation"
+//+kubebuilder:printcolumn:name="Reservation",type="string",JSONPath=".spec.reservation",description="Reservation"
 
 // Reservation is the Schema for the reservations API
 type Reservation struct {
