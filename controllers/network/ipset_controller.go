@@ -22,7 +22,6 @@ import (
 	"net"
 	"sort"
 
-	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -135,7 +134,7 @@ func (r *IPSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 		return ctrl.Result{}, nil
 	}
 
-	instance.Status.Reservation = []networkv1.IPAddress{}
+	instance.Status.Reservations = []networkv1.IPSetReservation{}
 
 	// Handle service delete
 	if !instance.DeletionTimestamp.IsZero() {
@@ -228,6 +227,8 @@ func (r *IPSetReconciler) reconcileNormal(ctx context.Context, instance *network
 	}
 
 	if len(netcfgs.Items) > 0 {
+		netcfg := &netcfgs.Items[0]
+
 		// get list of Reservation objects in the namespace
 		reservations := &networkv1.ReservationList{}
 		err = r.List(ctx, reservations, opts)
@@ -245,7 +246,7 @@ func (r *IPSetReconciler) reconcileNormal(ctx context.Context, instance *network
 		instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 
 		// TODO: add validation, we expect only one netcfg in a namespace
-		ipSetRes, err := r.ensureReservation(ctx, instance, &netcfgs.Items[0], helper, reservations)
+		ipSetRes, err := r.ensureReservation(ctx, instance, netcfg, helper, reservations)
 		if err != nil {
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				networkv1.ReservationReadyCondition,
@@ -256,30 +257,26 @@ func (r *IPSetReconciler) reconcileNormal(ctx context.Context, instance *network
 
 			return ctrl.Result{}, err
 		}
-		if len(ipSetRes.Spec.Reservation) != len(instance.Spec.Networks) {
+		if len(ipSetRes.Spec.Reservations) != len(instance.Spec.Networks) {
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				networkv1.ReservationReadyCondition,
 				condition.ErrorReason,
 				condition.SeverityError,
 				networkv1.ReservationMisMatchErrorMessage,
-				len(instance.Status.Reservation),
+				len(instance.Status.Reservations),
 				len(instance.Spec.Networks)))
 
 			return ctrl.Result{}, err
 		}
 
+		// sort instance.Status.Reservations by Network
+		sort.Slice(instance.Status.Reservations, func(i, j int) bool {
+			return instance.Status.Reservations[i].Network < instance.Status.Reservations[j].Network
+		})
+
 		instance.Status.Conditions.MarkTrue(networkv1.ReservationReadyCondition, networkv1.ReservationReadyMessage)
 
-		keys := maps.Keys(ipSetRes.Spec.Reservation)
-		sort.Strings(keys)
-		for _, key := range keys {
-			res := ipSetRes.Spec.Reservation[key]
-			instance.Status.Reservation = append(
-				instance.Status.Reservation,
-				res)
-		}
-
-		r.Log.Info(fmt.Sprintf("IPSet is ready: %s - %+v", instance.Name, instance.Status.Reservation))
+		r.Log.Info(fmt.Sprintf("IPSet is ready: %s - %+v", instance.Name, ipSetRes.Spec.Reservations))
 	} else {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.InputReadyCondition,
@@ -369,7 +366,7 @@ func (r *IPSetReconciler) ensureReservation(
 			Name:      ipset.Name,
 			UID:       ipset.GetUID(),
 		},
-		Reservation: map[string]networkv1.IPAddress{},
+		Reservations: map[string]networkv1.IPAddress{},
 	}
 	reservationLabels := map[string]string{}
 
@@ -421,8 +418,19 @@ func (r *IPSetReconciler) ensureReservation(
 			return nil, fmt.Errorf("Failed to do ip reservation: %w", err)
 		}
 
-		// add IP to the reservation
-		reservationSpec.Reservation[string(ipsetNet.Name)] = *ip
+		// add IP to the reservation and IPSet status reservations
+		reservationSpec.Reservations[string(ipsetNet.Name)] = *ip
+		ipset.Status.Reservations = append(ipset.Status.Reservations,
+			networkv1.IPSetReservation{
+				Network: ipsetNet.Name,
+				Subnet:  ipsetNet.SubnetName,
+				Address: ip.Address,
+				MTU:     netDef.MTU,
+				Cidr:    subnetDef.Cidr,
+				Vlan:    subnetDef.Vlan,
+				Gateway: subnetDef.Gateway,
+				Routes:  subnetDef.Routes,
+			})
 	}
 
 	return reservation, nil

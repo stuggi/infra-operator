@@ -78,7 +78,7 @@ spec:
                     type: string
                 type: object
                 x-kubernetes-map-type: atomic
-              reservation:
+              reservations:
                 additionalProperties:
                   description: IPAddress -
                   properties:
@@ -102,7 +102,7 @@ spec:
                 type: object
             required:
             - ipSetRef
-            - reservation
+            - reservations
             type: object
           status:
             description: ReservationStatus defines the observed state of Reservation

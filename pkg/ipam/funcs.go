@@ -45,7 +45,7 @@ func (a *AssignIPDetails) fixedIPExists() (*networkv1.IPAddress, error) {
 
 	// validate of nextip is already in a reservation and its not us
 	f := func(c networkv1.Reservation) bool {
-		return c.Spec.Reservation[a.NetName].Address == fixedIP
+		return c.Spec.Reservations[a.NetName].Address == fixedIP
 	}
 	idx := slices.IndexFunc(a.Reservelist.Items, f)
 	if idx >= 0 && a.Reservelist.Items[idx].Spec.IPSetRef.Name != a.IPSet {
@@ -90,7 +90,7 @@ func (a *AssignIPDetails) iterateForAssignment() (*networkv1.IPAddress, error) {
 
 			// validate of nextip is already in a reservation and its not us
 			f := func(c networkv1.Reservation) bool {
-				return c.Spec.Reservation[a.NetName].Address == nextip.String()
+				return c.Spec.Reservations[a.NetName].Address == nextip.String()
 			}
 			idx := slices.IndexFunc(a.Reservelist.Items, f)
 			if idx >= 0 && a.Reservelist.Items[idx].Spec.IPSetRef.Name != a.IPSet {

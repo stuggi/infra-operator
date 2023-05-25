@@ -40,7 +40,7 @@ type ReservationSpec struct {
 
 	// +kubebuilder:validation:Required
 	// Reservation, map (index network name) with reservation
-	Reservation map[string]IPAddress `json:"reservation"`
+	Reservations map[string]IPAddress `json:"reservations"`
 }
 
 // ReservationStatus defines the observed state of Reservation
