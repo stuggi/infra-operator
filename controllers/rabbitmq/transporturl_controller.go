@@ -304,7 +304,7 @@ func (r *TransportURLReconciler) createTransportURLSecret(
 ) *corev1.Secret {
 	query := ""
 	if tlsEnabled {
-		query += "?ssl=1"
+		query += "?ssl=1?ssl_options.verify=verify_none"
 	} else {
 		query += "?ssl=0"
 	}
