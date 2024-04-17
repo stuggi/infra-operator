@@ -352,10 +352,12 @@ func (r *Reconciler) generateConfigMaps(
 			"-o ssl_key=/etc/pki/tls/private/memcached.key " +
 			"-o ssl_ca_cert=/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"
 		memcachedPort = fmt.Sprint(memcached.MemcachedTLSPort)
+		instance.Status.TLSSupport = true
 	} else {
 		memcachedTLSListen = ""
 		memcachedTLSOptions = ""
 		memcachedPort = fmt.Sprint(memcached.MemcachedPort)
+		instance.Status.TLSSupport = false
 	}
 	templateParameters := map[string]interface{}{
 		"memcachedTLSListen":  memcachedTLSListen,
