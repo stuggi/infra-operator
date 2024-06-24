@@ -101,9 +101,25 @@ func GetDefaultDNSMasqSpec() map[string]interface{} {
 			"type": "LoadBalancer",
 		},
 	})
+	serviceOverride2 := interface{}(map[string]interface{}{
+		"metadata": map[string]map[string]string{
+			"annotations": {
+				"metallb.universe.tf/address-pool":    "ironic",
+				"metallb.universe.tf/allow-shared-ip": "ironic",
+				"metallb.universe.tf/loadBalancerIPs": "ironic-lb-ip-1",
+			},
+			"labels": {
+				"foo":     "bar",
+				"service": "dnsmasq",
+			},
+		},
+		"spec": map[string]interface{}{
+			"type": "LoadBalancer",
+		},
+	})
 
 	spec["override"] = map[string]interface{}{
-		"service": serviceOverride,
+		"service": []interface{}{serviceOverride, serviceOverride2},
 	}
 
 	return spec
@@ -651,4 +667,19 @@ func GetReservationFromNet(ipsetName types.NamespacedName, netName string) netwo
 	}
 
 	return res
+}
+
+func SimulateLBsReady(deploymentName types.NamespacedName) []types.NamespacedName {
+	svcName := types.NamespacedName{
+		Name:      deploymentName.Name + "-0",
+		Namespace: deploymentName.Namespace,
+	}
+	svcName2 := types.NamespacedName{
+		Name:      deploymentName.Name + "-1",
+		Namespace: deploymentName.Namespace,
+	}
+	th.SimulateLoadBalancerServiceIP(svcName)
+	th.SimulateLoadBalancerServiceIP(svcName2)
+
+	return []types.NamespacedName{svcName, svcName2}
 }

@@ -17,8 +17,6 @@ limitations under the License.
 package functional_test
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2" //revive:disable:dot-imports
 	. "github.com/onsi/gomega"    //revive:disable:dot-imports
 
@@ -146,7 +144,7 @@ var _ = Describe("DNSMasq controller", func() {
 		})
 
 		It("exposes the service", func() {
-			th.SimulateLoadBalancerServiceIP(deploymentName)
+			svcNames := SimulateLBsReady(deploymentName)
 			th.ExpectCondition(
 				dnsMasqName,
 				ConditionGetterFunc(DNSMasqConditionGetter),
@@ -154,14 +152,14 @@ var _ = Describe("DNSMasq controller", func() {
 				corev1.ConditionTrue,
 			)
 
-			svc := th.GetService(types.NamespacedName{
-				Namespace: namespace,
-				Name:      fmt.Sprintf("dnsmasq-%s", dnsMasqName.Name)})
-			Expect(svc.Labels["service"]).To(Equal("dnsmasq"))
+			for _, svcName := range svcNames {
+				svc := th.GetService(svcName)
+				Expect(svc.Labels["service"]).To(Equal("dnsmasq"))
+			}
 		})
 
 		It("creates a Deployment for the service", func() {
-			th.SimulateLoadBalancerServiceIP(deploymentName)
+			SimulateLBsReady(deploymentName)
 			th.ExpectConditionWithDetails(
 				dnsMasqName,
 				ConditionGetterFunc(DNSMasqConditionGetter),
@@ -191,7 +189,7 @@ var _ = Describe("DNSMasq controller", func() {
 
 		When("the DNSData CM gets updated", func() {
 			It("the CONFIG_HASH on the deployment changes", func() {
-				th.SimulateLoadBalancerServiceIP(deploymentName)
+				SimulateLBsReady(deploymentName)
 				cm := th.GetConfigMap(dnsDataCM)
 				configHash := ""
 				Eventually(func(g Gomega) {
@@ -223,7 +221,7 @@ var _ = Describe("DNSMasq controller", func() {
 
 		When("the DNSData CM gets deleted", func() {
 			It("the ConfigMap gets removed from the deployment", func() {
-				th.SimulateLoadBalancerServiceIP(deploymentName)
+				SimulateLBsReady(deploymentName)
 				th.GetConfigMap(dnsDataCM)
 				Eventually(func(g Gomega) {
 					depl := th.GetDeployment(deploymentName)

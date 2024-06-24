@@ -264,8 +264,10 @@ func (in *DNSMasqOverrideSpec) DeepCopyInto(out *DNSMasqOverrideSpec) {
 	*out = *in
 	if in.Service != nil {
 		in, out := &in.Service, &out.Service
-		*out = new(service.OverrideSpec)
-		(*in).DeepCopyInto(*out)
+		*out = make([]service.OverrideSpec, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 

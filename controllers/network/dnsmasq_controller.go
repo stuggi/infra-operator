@@ -26,6 +26,7 @@ import (
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -363,66 +364,71 @@ func (r *DNSMasqReconciler) reconcileNormal(ctx context.Context, instance *netwo
 	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
 
 	// expose the service
-	svcOverride := instance.Spec.Override.Service
-	if svcOverride == nil {
-		svcOverride = &service.OverrideSpec{}
+	svcOverrides := instance.Spec.Override.Service
+	if svcOverrides == nil {
+		svcOverrides = []service.OverrideSpec{
+			{},
+		}
 	}
 
-	// Create the service
-	svc, err := service.NewService(
-		service.GenericService(&service.GenericServiceDetails{
-			Name:      dnsmasq.ServiceName + "-" + instance.Name,
-			Namespace: instance.Namespace,
-			Labels:    serviceLabels,
-			Selector:  serviceLabels,
-			Port: service.GenericServicePort{
-				Name:     dnsmasq.ServiceName,
-				Port:     dnsmasq.DNSPort,
-				Protocol: corev1.ProtocolUDP,
-			},
-		}),
-		5,
-		svcOverride,
-	)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ExposeServiceReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.ExposeServiceReadyErrorMessage,
-			err.Error()))
+	for idx, svcOverride := range svcOverrides {
+		// Create the service
+		name := fmt.Sprintf("%s-%s-%d", dnsmasq.ServiceName, instance.Name, idx)
+		svc, err := service.NewService(
+			service.GenericService(&service.GenericServiceDetails{
+				Name:      name,
+				Namespace: instance.Namespace,
+				Labels:    serviceLabels,
+				Selector:  serviceLabels,
+				Port: service.GenericServicePort{
+					Name:     dnsmasq.ServiceName,
+					Port:     dnsmasq.DNSPort,
+					Protocol: corev1.ProtocolUDP,
+				},
+			}),
+			5,
+			ptr.To(svcOverride),
+		)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.ExposeServiceReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.ExposeServiceReadyErrorMessage,
+				err.Error()))
 
-		return ctrl.Result{}, err
+			return ctrl.Result{}, err
+		}
+
+		svc.AddAnnotation(map[string]string{
+			service.AnnotationIngressCreateKey: "false",
+		})
+
+		ctrlResult, err := svc.CreateOrPatch(ctx, helper)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.ExposeServiceReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.ExposeServiceReadyErrorMessage,
+				err.Error()))
+
+			return ctrlResult, err
+		} else if (ctrlResult != ctrl.Result{}) {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.ExposeServiceReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.ExposeServiceReadyRunningMessage))
+			return ctrlResult, nil
+		}
+
+		// Update status with LoadBalancerIPs
+		instance.Status.DNSAddresses = svc.GetExternalIPs()
+
+		// Update status with Cluster Addresses
+		instance.Status.DNSClusterAddresses = svc.GetClusterIPs()
 	}
-
-	svc.AddAnnotation(map[string]string{
-		service.AnnotationIngressCreateKey: "false",
-	})
-
-	ctrlResult, err := svc.CreateOrPatch(ctx, helper)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ExposeServiceReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.ExposeServiceReadyErrorMessage,
-			err.Error()))
-
-		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ExposeServiceReadyCondition,
-			condition.RequestedReason,
-			condition.SeverityInfo,
-			condition.ExposeServiceReadyRunningMessage))
-		return ctrlResult, nil
-	}
-
-	// Update status with LoadBalancerIPs
-	instance.Status.DNSAddresses = svc.GetExternalIPs()
-
-	// Update status with Cluster Addresses
-	instance.Status.DNSClusterAddresses = svc.GetClusterIPs()
 
 	// create service - end
 
@@ -435,7 +441,7 @@ func (r *DNSMasqReconciler) reconcileNormal(ctx context.Context, instance *netwo
 		time.Duration(5)*time.Second,
 	)
 
-	ctrlResult, err = depl.CreateOrPatch(ctx, helper)
+	ctrlResult, err := depl.CreateOrPatch(ctx, helper)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.DeploymentReadyCondition,
