@@ -89,6 +89,23 @@ func GetDefaultDNSMasqSpec() map[string]interface{} {
 	serviceOverride := interface{}(map[string]interface{}{
 		"metadata": map[string]map[string]string{
 			"annotations": {
+				"metallb.universe.tf/address-pool":    "foo",
+				"metallb.universe.tf/allow-shared-ip": "foo",
+				"metallb.universe.tf/loadBalancerIPs": "foo-lb-ip-1",
+			},
+			"labels": {
+				"foo":     "bar",
+				"service": "dnsmasq",
+			},
+		},
+		"spec": map[string]interface{}{
+			"type": "LoadBalancer",
+		},
+	})
+
+	servicesOverride := interface{}(map[string]interface{}{
+		"metadata": map[string]map[string]string{
+			"annotations": {
 				"metallb.universe.tf/address-pool":    "ctlplane",
 				"metallb.universe.tf/allow-shared-ip": "ctlplane",
 				"metallb.universe.tf/loadBalancerIPs": "internal-lb-ip-1,internal-lb-ip-2",
@@ -102,9 +119,26 @@ func GetDefaultDNSMasqSpec() map[string]interface{} {
 			"type": "LoadBalancer",
 		},
 	})
+	servicesOverride2 := interface{}(map[string]interface{}{
+		"metadata": map[string]map[string]string{
+			"annotations": {
+				"metallb.universe.tf/address-pool":    "ironic",
+				"metallb.universe.tf/allow-shared-ip": "ironic",
+				"metallb.universe.tf/loadBalancerIPs": "ironic-lb-ip-1",
+			},
+			"labels": {
+				"foo":     "bar",
+				"service": "dnsmasq",
+			},
+		},
+		"spec": map[string]interface{}{
+			"type": "LoadBalancer",
+		},
+	})
 
 	spec["override"] = map[string]interface{}{
-		"service": serviceOverride,
+		"service":  serviceOverride,
+		"services": []interface{}{servicesOverride, servicesOverride2},
 	}
 
 	return spec
@@ -696,4 +730,24 @@ func GetMemcached(name types.NamespacedName) *memcachedv1.Memcached {
 		g.Expect(k8sClient.Get(ctx, name, instance)).Should(Succeed())
 	}, timeout, interval).Should(Succeed())
 	return instance
+}
+
+func SimulateLBsReady(deploymentName types.NamespacedName) []types.NamespacedName {
+	svcName0 := types.NamespacedName{
+		Name:      deploymentName.Name + "-0",
+		Namespace: deploymentName.Namespace,
+	}
+	svcName1 := types.NamespacedName{
+		Name:      deploymentName.Name + "-1",
+		Namespace: deploymentName.Namespace,
+	}
+	svcName2 := types.NamespacedName{
+		Name:      deploymentName.Name + "-2",
+		Namespace: deploymentName.Namespace,
+	}
+	th.SimulateLoadBalancerServiceIP(svcName0)
+	th.SimulateLoadBalancerServiceIP(svcName1)
+	th.SimulateLoadBalancerServiceIP(svcName2)
+
+	return []types.NamespacedName{svcName0, svcName1, svcName2}
 }

@@ -17,7 +17,12 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
+
+	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -69,6 +74,13 @@ func (spec *DNSMasqSpec) Default() {
 // Default - common validations go here (for the OpenStackControlplane which uses this one)
 func (spec *DNSMasqSpecCore) Default() {
 	// nothing here
+
+	// spec.Override.Service is deprecated, append it to spec.Override.Services
+	// spec.Override.Service will be removed in a new api version
+	if spec.Override.Service.Spec != nil {
+		spec.Override.Services = append(spec.Override.Services, spec.Override.Service)
+		spec.Override.Service = service.OverrideSpec{}
+	}
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
@@ -80,16 +92,69 @@ var _ webhook.Validator = &DNSMasq{}
 func (r *DNSMasq) ValidateCreate() (admission.Warnings, error) {
 	dnsmasqlog.Info("validate create", "name", r.Name)
 
-	// TODO(user): fill in your validation logic upon object creation.
+	allErrs := field.ErrorList{}
+	basePath := field.NewPath("spec")
+
+	if err := r.Spec.ValidateCreate(basePath); err != nil {
+		allErrs = append(allErrs, err...)
+	}
+
+	if len(allErrs) != 0 {
+		return nil, apierrors.NewInvalid(GroupVersion.WithKind("DNSMasq").GroupKind(), r.Name, allErrs)
+	}
+
 	return nil, nil
 }
 
+// ValidateCreate - Exported function wrapping non-exported validate functions,
+// this function can be called externally to validate an DNSMasq spec.
+func (spec *DNSMasqSpec) ValidateCreate(basePath *field.Path) field.ErrorList {
+	return spec.DNSMasqSpecCore.ValidateCreate(basePath)
+}
+
+func (spec *DNSMasqSpecCore) ValidateCreate(basePath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// nothing in here yet
+
+	return allErrs
+}
+
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *DNSMasq) ValidateUpdate(_ runtime.Object) (admission.Warnings, error) {
+func (r *DNSMasq) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	dnsmasqlog.Info("validate update", "name", r.Name)
 
-	// TODO(user): fill in your validation logic upon object update.
+	oldDNSMasq, ok := old.(*DNSMasq)
+	if !ok || oldDNSMasq == nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("unable to convert existing object"))
+	}
+
+	allErrs := field.ErrorList{}
+	basePath := field.NewPath("spec")
+
+	if err := r.Spec.ValidateUpdate(oldDNSMasq.Spec, basePath); err != nil {
+		allErrs = append(allErrs, err...)
+	}
+
+	if len(allErrs) != 0 {
+		return nil, apierrors.NewInvalid(GroupVersion.WithKind("DNSMasq").GroupKind(), r.Name, allErrs)
+	}
+
 	return nil, nil
+}
+
+// ValidateUpdate - Exported function wrapping non-exported validate functions,
+// this function can be called externally to validate an DNSMasq spec.
+func (spec *DNSMasqSpec) ValidateUpdate(old DNSMasqSpec, basePath *field.Path) field.ErrorList {
+	return spec.DNSMasqSpecCore.ValidateUpdate(old.DNSMasqSpecCore, basePath)
+}
+
+func (spec *DNSMasqSpecCore) ValidateUpdate(_ DNSMasqSpecCore, basePath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// nothing in here yet
+
+	return allErrs
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type

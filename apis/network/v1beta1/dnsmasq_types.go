@@ -84,7 +84,11 @@ type DNSMasqSpecCore struct {
 // DNSMasqOverrideSpec to override the generated manifest of several child resources.
 type DNSMasqOverrideSpec struct {
 	// Override configuration for the Service created to serve traffic to the cluster.
-	Service *service.OverrideSpec `json:"service,omitempty"`
+	// Note: Deprecated, use Services. Service will be removed an a later api version
+	Service service.OverrideSpec `json:"service,omitempty"`
+
+	// Override configuration for the Services to be created to serve traffic to the cluster.
+	Services []service.OverrideSpec `json:"services,omitempty"`
 }
 
 // DNSMasqStatus defines the observed state of DNSMasq

@@ -14,8 +14,8 @@ spec:
   debug:
     service: false
   override:
-    service:
-      metadata:
+    services:
+    - metadata:
         annotations:
           metallb.universe.tf/address-pool: ctlplane
           metallb.universe.tf/allow-shared-ip: ctlplane
