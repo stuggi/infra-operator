@@ -41,15 +41,15 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
 	instancehav1 "github.com/openstack-k8s-operators/infra-operator/apis/instanceha/v1beta1"
-	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
+	memcachedv1 "github.com/openstack-k8s-operators/infra-operator/apis/memcached/v1beta1"
 	networkv1 "github.com/openstack-k8s-operators/infra-operator/apis/network/v1beta1"
 	rabbitmqv1beta1 "github.com/openstack-k8s-operators/infra-operator/apis/rabbitmq/v1beta1"
-	memcachedcontrollers "github.com/openstack-k8s-operators/infra-operator/controllers/memcached"
 	instancehacontrollers "github.com/openstack-k8s-operators/infra-operator/controllers/instanceha"
+	memcachedcontrollers "github.com/openstack-k8s-operators/infra-operator/controllers/memcached"
 	networkcontrollers "github.com/openstack-k8s-operators/infra-operator/controllers/network"
 	rabbitmqcontrollers "github.com/openstack-k8s-operators/infra-operator/controllers/rabbitmq"
+	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -153,14 +153,14 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Memcached")
 		os.Exit(1)
 	}
-        if err = (&instancehacontrollers.Reconciler{
-                Client:  mgr.GetClient(),
-                Kclient: kclient,
-                Scheme:  mgr.GetScheme(),
-        }).SetupWithManager(mgr); err != nil {
-                setupLog.Error(err, "unable to create controller", "controller", "InstanceHA")
-                os.Exit(1)
-        }
+	if err = (&instancehacontrollers.Reconciler{
+		Client:  mgr.GetClient(),
+		Kclient: kclient,
+		Scheme:  mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "InstanceHA")
+		os.Exit(1)
+	}
 
 	if err = (&networkcontrollers.DNSMasqReconciler{
 		Client:  mgr.GetClient(),
@@ -209,10 +209,10 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Memcached")
 			os.Exit(1)
 		}
-                if err = (&instancehav1.InstanceHA{}).SetupWebhookWithManager(mgr); err != nil {
-                        setupLog.Error(err, "unable to create webhook", "webhook", "Memcached")
-                        os.Exit(1)
-                }
+		if err = (&instancehav1.InstanceHA{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Memcached")
+			os.Exit(1)
+		}
 		if err = (&networkv1.DNSMasq{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "DNSMasq")
 			os.Exit(1)
