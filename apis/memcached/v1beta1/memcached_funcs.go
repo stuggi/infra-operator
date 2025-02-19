@@ -22,6 +22,7 @@ import (
 
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/tls"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -29,25 +30,22 @@ import (
 )
 
 const (
-	// CertKey - key of the secret entry holding the cert
-	CertKey = "tls.crt"
-	// PrivateKey - key of the secret entry holding the cert private key
-	PrivateKey = "tls.key"
-	// CAKey - key of the secret entry holding the CA
-	CAKey = "ca.crt"
+	// CertKey - mtls cert file name
+	CertKey = "mtls.crt"
+	// PrivateKey - mtls private key file name
+	PrivateKey = "mtls.key"
+	// CAKey - mtls cacert file name
+	CAKey = "mtls-ca.crt"
 
-	// CaPath - path to the ca certificate (Kolla will move this)
-	CaPath = "/var/lib/config-data/mtls/certs/mtls-ca.crt"
-	// CaPathDst - path to the ca certificate
-	CaPathDst = "/etc/pki/tls/certs/mtls-ca.crt"
-	// CertPath - path to the client certificate (Kolla will move this)
-	CertPath = "/var/lib/config-data/mtls/certs/mtls.crt"
 	// CertPathDst - path to the client certificate
-	CertPathDst = "/etc/pki/tls/certs/mtls.crt"
-	// KeyPath - path to the key (Kolla will move this)
-	KeyPath = "/var/lib/config-data/mtls/private/mtls.key"
+	CertPathDst = "/etc/pki/tls/certs"
 	// KeyPathDst - path to the key
-	KeyPathDst = "/etc/pki/tls/private/mtls.key"
+	KeyPathDst = "/etc/pki/tls/private"
+
+	// DefaultCertMountDir - default path to mount cert files inside container
+	DefaultCertMountDir = "/var/lib/config-data/mtls/certs"
+	// DefaultKeyMountDir - default path to mount cert keys inside container
+	DefaultKeyMountDir = "/var/lib/config-data/mtls/private"
 )
 
 // IsReady - returns true if Memcached is reconciled successfully
@@ -141,23 +139,35 @@ func GetMemcachedByName(
 }
 
 // CreateMTLSVolumeMounts - add volume mount for MTLS certificates and CA certificate
-func CreateMTLSVolumeMounts(SecretName string) []corev1.VolumeMount {
+func (instance *Memcached) CreateMTLSVolumeMounts(CertMountPath *string, KeyMountPath *string) []corev1.VolumeMount {
 	volumeMounts := []corev1.VolumeMount{}
-	if SecretName != "" {
+	if instance.Spec.TLS.MTLS.AuthCertSecret.SecretName != nil {
+		CertPath := DefaultCertMountDir + "/" + CertKey
+		CaPath := DefaultCertMountDir + "/" + CAKey
+		KeyPath := DefaultKeyMountDir + "/" + PrivateKey
+
+		if CertMountPath != nil {
+			CertPath = *CertMountPath + "/" + CertKey
+			CaPath = *CertMountPath + "/" + CAKey
+		}
+		if KeyMountPath != nil {
+			KeyPath = *KeyMountPath + "/" + PrivateKey
+		}
+
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
-			Name:      SecretName,
+			Name:      *instance.Spec.TLS.MTLS.AuthCertSecret.SecretName,
 			MountPath: CertPath,
-			SubPath:   CertKey,
+			SubPath:   tls.CertKey,
 			ReadOnly:  true,
 		}, corev1.VolumeMount{
-			Name:      SecretName,
+			Name:      *instance.Spec.TLS.MTLS.AuthCertSecret.SecretName,
 			MountPath: KeyPath,
-			SubPath:   PrivateKey,
+			SubPath:   tls.PrivateKey,
 			ReadOnly:  true,
 		}, corev1.VolumeMount{
-			Name:      SecretName,
+			Name:      *instance.Spec.TLS.MTLS.AuthCertSecret.SecretName,
 			MountPath: CaPath,
-			SubPath:   CAKey,
+			SubPath:   tls.CAKey,
 			ReadOnly:  true,
 		})
 	}
@@ -166,14 +176,14 @@ func CreateMTLSVolumeMounts(SecretName string) []corev1.VolumeMount {
 }
 
 // CreateMTLSVolume - add volume for MTLS certificates and CA certificate for the service
-func CreateMTLSVolume(SecretName string) corev1.Volume {
+func (instance *Memcached) CreateMTLSVolume() corev1.Volume {
 	volume := corev1.Volume{}
-	if SecretName != "" {
+	if instance.Spec.TLS.MTLS.AuthCertSecret.SecretName != nil {
 		volume = corev1.Volume{
-			Name: SecretName,
+			Name: *instance.Spec.TLS.MTLS.AuthCertSecret.SecretName,
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName:  SecretName,
+					SecretName:  *instance.Spec.TLS.MTLS.AuthCertSecret.SecretName,
 					DefaultMode: ptr.To[int32](0400),
 				},
 			},
@@ -185,15 +195,15 @@ func CreateMTLSVolume(SecretName string) corev1.Volume {
 
 // CaMountPath - returns path to the ca certificate
 func CaMountPath() string {
-	return CaPathDst
+	return CertPathDst + "/" + CAKey
 }
 
 // CertMountPath - returns path to the certificate
 func CertMountPath() string {
-	return CertPathDst
+	return CertPathDst + "/" + CertKey
 }
 
 // KeyMountPath - returns path to the key
 func KeyMountPath() string {
-	return KeyPathDst
+	return KeyPathDst + "/" + PrivateKey
 }
