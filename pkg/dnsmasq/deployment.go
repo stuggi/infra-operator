@@ -70,8 +70,6 @@ func Deployment(
 	dnsmasqCmd = append(dnsmasqCmd, "--interface=*")
 	dnsmasqCmd = append(dnsmasqCmd, "--conf-dir=/etc/dnsmasq.d")
 	dnsmasqCmd = append(dnsmasqCmd, "--hostsdir=/etc/dnsmasq.d/hosts")
-	dnsmasqCmd = append(dnsmasqCmd, "--keep-in-foreground")
-	dnsmasqCmd = append(dnsmasqCmd, "--no-daemon")
 	dnsmasqCmd = append(dnsmasqCmd, "--log-debug")
 	dnsmasqCmd = append(dnsmasqCmd, "--bind-interfaces")
 	dnsmasqCmd = append(dnsmasqCmd, "--listen-address=$(POD_IP)")
@@ -85,8 +83,10 @@ func Deployment(
 	dnsmasqCmd = append(dnsmasqCmd, "--bogus-priv")
 	dnsmasqCmd = append(dnsmasqCmd, "--log-queries")
 
-	// append dnsmasqCmd for service container
-	args = append(args, strings.Join(dnsmasqCmd, " "))
+	// append dnsmasqCmd for service container with daemon monitoring
+	// Start dnsmasq in daemon mode and monitor the process
+	daemonCmd := strings.Join(dnsmasqCmd, " ") + " && while pgrep -f dnsmasq > /dev/null; do sleep 30; done"
+	args = append(args, daemonCmd)
 
 	// append --test for initcontainer check config syntax
 	dnsmasqCmd = append(dnsmasqCmd, "--test")
