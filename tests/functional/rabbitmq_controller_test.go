@@ -19,10 +19,12 @@ package functional_test
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2" //revive:disable:dot-imports
 	. "github.com/onsi/gomega"    //revive:disable:dot-imports
 	rabbitmqv1 "github.com/openstack-k8s-operators/infra-operator/apis/rabbitmq/v1beta1"
+	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 
 	//revive:disable-next-line:dot-imports
 
@@ -79,7 +81,6 @@ var _ = Describe("RabbitMQ Controller", func() {
 				g.Expect(rabbitmqServerAdditionalErlArgs).To(ContainSubstring("-proto_dist inet_tcp"))
 				g.Expect(cluster.Spec.Rabbitmq.AdditionalConfig).To(ContainSubstring("prometheus.tcp.ip = ::"))
 			}, timeout, interval).Should(Succeed())
-
 		})
 	})
 
@@ -121,6 +122,49 @@ var _ = Describe("RabbitMQ Controller", func() {
 			}, timeout, interval).Should(Succeed())
 		})
 
+		It("should configure TLS 1.2 only for non-FIPS mode", func() {
+			SimulateRabbitMQClusterReady(rabbitmqName)
+			Eventually(func(g Gomega) {
+				cluster := GetRabbitMQCluster(rabbitmqName)
+				advancedConfig := cluster.Spec.Rabbitmq.AdvancedConfig
+
+				// Verify AdvancedConfig contains TLS 1.2 only for non-FIPS
+				g.Expect(advancedConfig).To(ContainSubstring("['tlsv1.2']"))
+				// Ensure it doesn't contain the FIPS version
+				g.Expect(strings.Count(advancedConfig, "['tlsv1.2','tlsv1.3']")).To(Equal(0))
+
+				// Verify all three TLS configurations use TLS 1.2 only
+				g.Expect(strings.Count(advancedConfig, "['tlsv1.2']")).To(Equal(3))
+
+				// Verify specific sections exist
+				g.Expect(advancedConfig).To(ContainSubstring("{rabbit, ["))
+				g.Expect(advancedConfig).To(ContainSubstring("{rabbitmq_management, ["))
+				g.Expect(advancedConfig).To(ContainSubstring("{client, ["))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should verify inter-node TLS configuration uses TLS 1.2 only", func() {
+			SimulateRabbitMQClusterReady(rabbitmqName)
+
+			// Get the inter-node TLS config from ConfigMap
+			configMapName := types.NamespacedName{
+				Name:      fmt.Sprintf("%s-config-data", rabbitmqName.Name),
+				Namespace: rabbitmqName.Namespace,
+			}
+
+			Eventually(func(g Gomega) {
+				cm := th.GetConfigMap(configMapName)
+				g.Expect(cm.Data).To(HaveKey("inter_node_tls.config"))
+
+				interNodeConfig := cm.Data["inter_node_tls.config"]
+				// Verify server and client configurations use TLS 1.2 only
+				g.Expect(interNodeConfig).To(ContainSubstring("{versions, ['tlsv1.2']}"))
+				// Ensure no FIPS versions
+				g.Expect(strings.Count(interNodeConfig, "['tlsv1.2','tlsv1.3']")).To(Equal(0))
+				// Should have TLS 1.2 in both server and client sections
+				g.Expect(strings.Count(interNodeConfig, "['tlsv1.2']")).To(Equal(2))
+			}, timeout, interval).Should(Succeed())
+		})
 	})
 
 	When("RabbitMQ gets created with FIPS enabled", func() {
@@ -163,9 +207,90 @@ var _ = Describe("RabbitMQ Controller", func() {
 				g.Expect(rabbitmqServerAdditionalErlArgs).To(ContainSubstring("-crypto fips_mode true"))
 				g.Expect(rabbitmqServerAdditionalErlArgs).To(ContainSubstring("-proto_dist inet_tls"))
 				g.Expect(rabbitmqServerAdditionalErlArgs).To(ContainSubstring("-ssl_dist_optfile /etc/rabbitmq/inter-node-tls.config"))
-
 			}, timeout, interval).Should(Succeed())
+		})
 
+		It("should configure TLS 1.2 and 1.3 for FIPS mode", func() {
+			SimulateRabbitMQClusterReady(rabbitmqName)
+			Eventually(func(g Gomega) {
+				cluster := GetRabbitMQCluster(rabbitmqName)
+				advancedConfig := cluster.Spec.Rabbitmq.AdvancedConfig
+
+				// Verify AdvancedConfig contains both TLS 1.2 and 1.3 for FIPS
+				g.Expect(advancedConfig).To(ContainSubstring("['tlsv1.2','tlsv1.3']"))
+
+				// Verify all three TLS configurations use both TLS 1.2 and 1.3
+				// Count occurrences of the FIPS TLS version string
+				tlsVersionCount := strings.Count(advancedConfig, "['tlsv1.2','tlsv1.3']")
+				g.Expect(tlsVersionCount).To(Equal(3), "Should have TLS 1.2+1.3 in ssl_options, ssl_config, and client sections")
+
+				// Verify specific sections exist
+				g.Expect(advancedConfig).To(ContainSubstring("{rabbit, ["))
+				g.Expect(advancedConfig).To(ContainSubstring("{rabbitmq_management, ["))
+				g.Expect(advancedConfig).To(ContainSubstring("{client, ["))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should verify inter-node TLS configuration uses TLS 1.2 and 1.3 for FIPS", func() {
+			SimulateRabbitMQClusterReady(rabbitmqName)
+
+			// Get the inter-node TLS config from ConfigMap
+			configMapName := types.NamespacedName{
+				Name:      fmt.Sprintf("%s-config-data", rabbitmqName.Name),
+				Namespace: rabbitmqName.Namespace,
+			}
+
+			Eventually(func(g Gomega) {
+				cm := th.GetConfigMap(configMapName)
+				g.Expect(cm.Data).To(HaveKey("inter_node_tls.config"))
+
+				interNodeConfig := cm.Data["inter_node_tls.config"]
+				// Verify server and client configurations use both TLS 1.2 and 1.3
+				g.Expect(interNodeConfig).To(ContainSubstring("{versions, ['tlsv1.2','tlsv1.3']}"))
+
+				// Verify both server and client sections have FIPS TLS versions
+				tlsVersionCount := strings.Count(interNodeConfig, "['tlsv1.2','tlsv1.3']")
+				g.Expect(tlsVersionCount).To(Equal(2), "Should have TLS 1.2+1.3 in both server and client sections")
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	When("RabbitMQ TLS input validation", func() {
+		It("should set TLSInputReadyCondition to true when valid TLS secret is provided", func() {
+			certSecret := CreateCertSecret(rabbitmqName)
+			DeferCleanup(th.DeleteSecret, types.NamespacedName{Name: certSecret.Name, Namespace: namespace})
+
+			spec := GetDefaultRabbitMQSpec()
+			spec["tls"] = map[string]any{
+				"secretName": certSecret.Name,
+			}
+			rabbitmq := CreateRabbitMQ(rabbitmqName, spec)
+			DeferCleanup(th.DeleteInstance, rabbitmq)
+
+			Eventually(func(g Gomega) {
+				instance := GetRabbitMQ(rabbitmqName)
+				g.Expect(instance.Status.Conditions.Has(condition.TLSInputReadyCondition)).To(BeTrue())
+				tlsCondition := instance.Status.Conditions.Get(condition.TLSInputReadyCondition)
+				g.Expect(tlsCondition.Status).To(Equal(corev1.ConditionTrue))
+				g.Expect(tlsCondition.Message).To(Equal(condition.InputReadyMessage))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should set TLSInputReadyCondition to false when TLS secret is missing", func() {
+			spec := GetDefaultRabbitMQSpec()
+			spec["tls"] = map[string]any{
+				"secretName": "non-existent-secret",
+			}
+			rabbitmq := CreateRabbitMQ(rabbitmqName, spec)
+			DeferCleanup(th.DeleteInstance, rabbitmq)
+
+			Eventually(func(g Gomega) {
+				instance := GetRabbitMQ(rabbitmqName)
+				g.Expect(instance.Status.Conditions.Has(condition.TLSInputReadyCondition)).To(BeTrue())
+				tlsCondition := instance.Status.Conditions.Get(condition.TLSInputReadyCondition)
+				g.Expect(tlsCondition.Status).To(Equal(corev1.ConditionFalse))
+				g.Expect(string(tlsCondition.Reason)).To(Equal(string(condition.RequestedReason)))
+			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -200,7 +325,6 @@ var _ = Describe("RabbitMQ Controller", func() {
 				g.Expect(*cluster.Spec.Override.StatefulSet.Spec.Replicas).To(Equal(int32(3)))
 				g.Expect(cluster.Spec.Override.StatefulSet.Spec.Template.Spec.Containers[0].Name).To(Equal("foobar"))
 			}, timeout, interval).Should(Succeed())
-
 		})
 	})
 
@@ -226,7 +350,6 @@ var _ = Describe("RabbitMQ Controller", func() {
 				g.Expect(*cluster.Spec.Override.StatefulSet.Spec.Replicas).To(Equal(int32(3)))
 				g.Expect(cluster.Spec.Override.StatefulSet.Spec.Template.Spec.Containers[0].Name).To(Equal(rabbitmqDefaultName))
 			}, timeout, interval).Should(Succeed())
-
 		})
 	})
 
