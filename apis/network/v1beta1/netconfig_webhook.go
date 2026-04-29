@@ -30,14 +30,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	k8snet "k8s.io/utils/net"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
 var netconfiglog = logf.Log.WithName("netconfig-resource")
 
-var _ webhook.Defaulter = &NetConfig{}
+// Implements defaulting logic; registered via CustomDefaulter in internal/webhook
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *NetConfig) Default() {
@@ -48,7 +47,7 @@ func (r *NetConfig) Default() {
 	}
 }
 
-var _ webhook.Validator = &NetConfig{}
+// Implements validation logic; registered via CustomValidator in internal/webhook
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *NetConfig) ValidateCreate() (admission.Warnings, error) {

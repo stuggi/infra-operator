@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -152,7 +151,7 @@ func (spec *RabbitMqSpecCore) Default(isNew bool) {
 	}
 }
 
-var _ webhook.Validator = &RabbitMq{}
+// Implements validation logic; registered via CustomValidator in internal/webhook
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *RabbitMq) ValidateCreate() (admission.Warnings, error) {

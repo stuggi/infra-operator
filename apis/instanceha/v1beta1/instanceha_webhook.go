@@ -22,7 +22,6 @@ package v1beta1
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -45,7 +44,7 @@ func SetupInstanceHaDefaults(defaults InstanceHaDefaults) {
 	instancehalog.Info("InstanceHa defaults initialized", "defaults", defaults)
 }
 
-var _ webhook.Defaulter = &InstanceHa{}
+// Implements defaulting logic; registered via CustomDefaulter in internal/webhook
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *InstanceHa) Default() {
@@ -79,7 +78,7 @@ func (spec *InstanceHaSpec) Default() {
         }
 }
 
-var _ webhook.Validator = &InstanceHa{}
+// Implements validation logic; registered via CustomValidator in internal/webhook
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *InstanceHa) ValidateCreate() (admission.Warnings, error) {
