@@ -26,14 +26,6 @@ import (
 )
 
 const (
-	// AnnotationHostnameKey -
-	AnnotationHostnameKey = "dnsmasq.network.openstack.org/hostname"
-
-	// AnnotationCNAMEsKey - value is a comma separated list of additional
-	// hostnames to register for the Service's LoadBalancer IP, alongside
-	// AnnotationHostnameKey
-	AnnotationCNAMEsKey = "dnsmasq.network.openstack.org/cnames"
-
 	// DNSDataLabelSelectorKey - label selector to identify config maps with hosts data
 	DNSDataLabelSelectorKey = "dnsmasqhosts"
 

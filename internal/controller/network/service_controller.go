@@ -25,6 +25,7 @@ import (
 
 	"github.com/go-logr/logr"
 	networkv1 "github.com/openstack-k8s-operators/infra-operator/apis/network/v1beta1"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -123,14 +124,14 @@ func (r *ServiceReconciler) getServiceDNSData(
 
 	for _, svc := range svcList.Items {
 		if svc.Annotations != nil {
-			// if the service has our networkv1.AnnotationHostnameKey get
+			// if the service has our service.AnnotationHostnameKey get
 			// the ips from its status if it is a LoadBalancer type.
-			// networkv1.AnnotationCNAMEsKey may additionally carry a comma
+			// service.AnnotationCNAMEsKey may additionally carry a comma
 			// separated list of extra hostnames (e.g. a custom public
 			// hostname) registered as DNS aliases (CNAMEs) of hostname.
-			if hostname, ok := svc.Annotations[networkv1.AnnotationHostnameKey]; ok && svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
+			if hostname, ok := svc.Annotations[service.AnnotationHostnameKey]; ok && svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
 				var cnames []string
-				if cnameAnno, ok := svc.Annotations[networkv1.AnnotationCNAMEsKey]; ok {
+				if cnameAnno, ok := svc.Annotations[service.AnnotationCNAMEsKey]; ok {
 					for _, cname := range strings.Split(cnameAnno, ",") {
 						if cname = strings.TrimSpace(cname); cname != "" {
 							cnames = append(cnames, cname)
