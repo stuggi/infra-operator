@@ -81,8 +81,6 @@ github.com/onsi/gomega v1.44.0 h1:eAiGl3Pw5jz5GQdDff0BcxYpAX1JxW8xD7mFUuwNfZQ=
 github.com/onsi/gomega v1.44.0/go.mod h1:e/C2HwaZ1DhvjzXXuFhcR7hY7Sh9pl7MmoWKEjzwcdA=
 github.com/openshift/api v0.0.0-20260710141509-36dec0bfafe4 h1:YVY7Mb0AdJBbNgC/Zz9R/ZwhixOmZNA8P+6ZPaDW/0M=
 github.com/openshift/api v0.0.0-20260710141509-36dec0bfafe4/go.mod h1:SPLf21TYPipzCO67BURkCfK6dcIIxx0oNRVWaOyRcXM=
-github.com/openstack-k8s-operators/lib-common/modules/common v0.6.1-0.20261001122809-0e19abbc9e47 h1:M5LtsEw3p6FTaezk6oAgK/zrqnKWkagZnqnAq6BV4nU=
-github.com/openstack-k8s-operators/lib-common/modules/common v0.6.1-0.20261001122809-0e19abbc9e47/go.mod h1:HsTiW0fVqBtJWS+jsfJV3M2i3x7ZXQcXwZU7a07n1AA=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
@@ -106,6 +104,8 @@ github.com/stretchr/objx v0.5.2/go.mod h1:FRsXN1f5AsAjCGJKqEizvkpNtU+EGNCLh3NxZ/
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
+github.com/stuggi/lib-common/modules/common v0.0.0-20261009091302-bf2a65fbbb74 h1:5uCi27sddaoLapPaw6vZna03JA9IyxkYywbX6BT0unQ=
+github.com/stuggi/lib-common/modules/common v0.0.0-20261009091302-bf2a65fbbb74/go.mod h1:HsTiW0fVqBtJWS+jsfJV3M2i3x7ZXQcXwZU7a07n1AA=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
 github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
