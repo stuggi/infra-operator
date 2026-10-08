@@ -38,6 +38,15 @@ func getVolumes(
 				},
 			},
 		},
+		{
+			// Backs the --conf-dir=/etc/dnsmasq.d/cnames mount point so that
+			// directory always exists, even when no DNSData carries CNAMEs
+			// yet - dnsmasq fails to start if a --conf-dir target is missing.
+			Name: "cnames",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
 	}
 
 	for _, cm := range cms.Items {
@@ -70,6 +79,10 @@ func getVolumeMounts(
 			SubPath:   name,
 			ReadOnly:  true,
 		},
+		{
+			Name:      "cnames",
+			MountPath: "/etc/dnsmasq.d/cnames",
+		},
 	}
 
 	for _, cm := range cms.Items {
@@ -79,6 +92,15 @@ func getVolumeMounts(
 			SubPath:   cm.Name,
 			ReadOnly:  true,
 		})
+
+		if _, ok := cm.Data[cm.Name+"-cnames"]; ok {
+			volumeMounts = append(volumeMounts, corev1.VolumeMount{
+				Name:      cm.Name,
+				MountPath: "/etc/dnsmasq.d/cnames/" + cm.Name,
+				SubPath:   cm.Name + "-cnames",
+				ReadOnly:  true,
+			})
+		}
 	}
 
 	return volumeMounts

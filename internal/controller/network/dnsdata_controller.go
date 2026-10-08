@@ -18,6 +18,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -43,6 +44,12 @@ import (
 	dnsmasq "github.com/openstack-k8s-operators/infra-operator/internal/dnsmasq"
 	corev1 "k8s.io/api/core/v1"
 )
+
+// ErrCNAMEInvariant indicates a DNSHost entry set CNAMEs without exactly one
+// Hostnames entry (the canonical name a CNAME can alias). This is a permanent
+// error caused by the CR spec, not a transient failure: retrying without a
+// spec change can't fix it.
+var ErrCNAMEInvariant = errors.New("cnames requires exactly one hostname")
 
 // DNSDataReconciler reconciles a DNSData object
 type DNSDataReconciler struct {
@@ -187,6 +194,12 @@ func (r *DNSDataReconciler) reconcileNormal(ctx context.Context, instance *netwo
 			condition.SeverityWarning,
 			condition.ServiceConfigReadyErrorMessage,
 			err.Error()))
+		if errors.Is(err, ErrCNAMEInvariant) {
+			// Permanent error from an invalid CR spec: requeuing via a
+			// returned error (exponential backoff) won't help until the
+			// spec changes, which already triggers its own reconcile.
+			return ctrl.Result{}, nil
+		}
 		return ctrl.Result{}, err
 	}
 
@@ -223,6 +236,8 @@ func (r *DNSDataReconciler) generateServiceConfigMaps(
 	configMapData := map[string]string{}
 
 	var configData string
+	var cnameData string
+	var validationErr error
 	for _, host := range instance.Spec.Hosts {
 		configData += host.IP
 		hosts := host.Hostnames
@@ -230,9 +245,27 @@ func (r *DNSDataReconciler) generateServiceConfigMaps(
 		hostsStr := strings.Join(hosts, " ")
 		configData += " " + hostsStr
 		configData += "\n"
+
+		if len(host.CNAMEs) > 0 {
+			if len(host.Hostnames) != 1 {
+				// Ambiguous which hostname is canonical: surface the error via
+				// the ServiceConfigReadyCondition below but keep generating
+				// config for the other, valid hosts instead of aborting the
+				// whole ConfigMap.
+				validationErr = fmt.Errorf(
+					"host %s has CNAMEs set but does not have exactly one hostname, cannot determine canonical name: %w", host.IP, ErrCNAMEInvariant)
+				continue
+			}
+			for _, cname := range host.CNAMEs {
+				cnameData += fmt.Sprintf("cname=%s,%s\n", cname, host.Hostnames[0])
+			}
+		}
 	}
 
 	configMapData[instance.Name] = configData
+	if cnameData != "" {
+		configMapData[instance.Name+"-cnames"] = cnameData
+	}
 
 	cms := []util.Template{
 		{
@@ -245,5 +278,9 @@ func (r *DNSDataReconciler) generateServiceConfigMaps(
 		},
 	}
 
-	return configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
+	if err := configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars); err != nil {
+		return err
+	}
+
+	return validationErr
 }

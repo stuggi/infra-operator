@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strings"
 
 	"github.com/go-logr/logr"
 	networkv1 "github.com/openstack-k8s-operators/infra-operator/apis/network/v1beta1"
@@ -123,8 +124,20 @@ func (r *ServiceReconciler) getServiceDNSData(
 	for _, svc := range svcList.Items {
 		if svc.Annotations != nil {
 			// if the service has our networkv1.AnnotationHostnameKey get
-			// the ips from its status if it is a LoadBalancer type
+			// the ips from its status if it is a LoadBalancer type.
+			// networkv1.AnnotationCNAMEsKey may additionally carry a comma
+			// separated list of extra hostnames (e.g. a custom public
+			// hostname) registered as DNS aliases (CNAMEs) of hostname.
 			if hostname, ok := svc.Annotations[networkv1.AnnotationHostnameKey]; ok && svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
+				var cnames []string
+				if cnameAnno, ok := svc.Annotations[networkv1.AnnotationCNAMEsKey]; ok {
+					for _, cname := range strings.Split(cnameAnno, ",") {
+						if cname = strings.TrimSpace(cname); cname != "" {
+							cnames = append(cnames, cname)
+						}
+					}
+				}
+
 				if len(svc.Status.LoadBalancer.Ingress) > 0 {
 					for _, ingr := range svc.Status.LoadBalancer.Ingress {
 						addr := net.ParseIP(ingr.IP)
@@ -136,10 +149,17 @@ func (r *ServiceReconciler) getServiceDNSData(
 							svcDNSHosts[addr.String()] = networkv1.DNSHost{
 								IP:        addr.String(),
 								Hostnames: []string{hostname},
+								CNAMEs:    cnames,
 							}
 						} else {
+							// Multiple Services share this IP (e.g. a shared
+							// VIP): CNAMEs require exactly one canonical
+							// Hostname, so once a second hostname joins this
+							// entry any CNAMEs become ambiguous and are
+							// dropped rather than forwarded to DNSData.
 							host.Hostnames = append(host.Hostnames, hostname)
 							sort.Strings(host.Hostnames)
+							host.CNAMEs = nil
 
 							svcDNSHosts[addr.String()] = host
 						}

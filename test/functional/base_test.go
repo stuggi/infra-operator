@@ -622,7 +622,7 @@ func MemcachedConditionGetter(name types.NamespacedName) condition.Conditions {
 	return instance.Status.Conditions
 }
 
-func CreateLoadBalancerService(name types.NamespacedName, addDNSAnno bool) *corev1.Service {
+func CreateLoadBalancerService(name types.NamespacedName, addDNSAnno bool, cnames ...string) *corev1.Service {
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name.Name,
@@ -653,6 +653,9 @@ func CreateLoadBalancerService(name types.NamespacedName, addDNSAnno bool) *core
 
 	if addDNSAnno {
 		svc.Annotations[networkv1.AnnotationHostnameKey] = fmt.Sprintf("%s.%s.svc", name.Name, name.Namespace)
+		if len(cnames) > 0 {
+			svc.Annotations[networkv1.AnnotationCNAMEsKey] = strings.Join(cnames, ",")
+		}
 	}
 
 	Expect(k8sClient.Create(ctx, svc.DeepCopy())).Should(Succeed())
