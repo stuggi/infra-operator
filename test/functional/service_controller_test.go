@@ -90,6 +90,87 @@ var _ = Describe("Service controller", func() {
 		})
 	})
 
+	When("A Service is created with the cnames annotation", func() {
+		BeforeEach(func() {
+			instance := CreateDNSMasq(namespace, GetDefaultDNSMasqSpec())
+			dnsMasqName = types.NamespacedName{
+				Name:      instance.GetName(),
+				Namespace: namespace,
+			}
+			serviceName = types.NamespacedName{
+				Name:      "some-service",
+				Namespace: namespace,
+			}
+			svcDNSData = types.NamespacedName{
+				Name:      fmt.Sprintf("%s-svc", dnsMasqName.Name),
+				Namespace: namespace,
+			}
+
+			svc := CreateLoadBalancerService(serviceName, true, "custom.example.com")
+
+			DeferCleanup(th.DeleteInstance, svc)
+			DeferCleanup(th.DeleteInstance, instance)
+		})
+
+		It("should register the cnames annotation as DNSHost.CNAMEs, keeping Hostnames to the primary name", func() {
+			svc := th.GetService(serviceName)
+			Expect(svc).To(Not(BeNil()))
+
+			Eventually(func(g Gomega) {
+				dnsdata := GetDNSData(svcDNSData)
+				g.Expect(dnsdata).To(Not(BeNil()))
+				g.Expect(dnsdata.Spec.Hosts).To(Not(BeNil()))
+				g.Expect(dnsdata.Spec.Hosts[0].IP).To(Equal("172.20.0.80"))
+				g.Expect(dnsdata.Spec.Hosts[0].Hostnames).To(ConsistOf(
+					fmt.Sprintf("some-service.%s.svc", namespace)))
+				g.Expect(dnsdata.Spec.Hosts[0].CNAMEs).To(ConsistOf("custom.example.com"))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	When("Two Services share the same LoadBalancer IP and one sets the cnames annotation", func() {
+		var otherServiceName types.NamespacedName
+
+		BeforeEach(func() {
+			instance := CreateDNSMasq(namespace, GetDefaultDNSMasqSpec())
+			dnsMasqName = types.NamespacedName{
+				Name:      instance.GetName(),
+				Namespace: namespace,
+			}
+			serviceName = types.NamespacedName{
+				Name:      "some-service",
+				Namespace: namespace,
+			}
+			otherServiceName = types.NamespacedName{
+				Name:      "other-service",
+				Namespace: namespace,
+			}
+			svcDNSData = types.NamespacedName{
+				Name:      fmt.Sprintf("%s-svc", dnsMasqName.Name),
+				Namespace: namespace,
+			}
+
+			svc := CreateLoadBalancerService(serviceName, true, "custom.example.com")
+			otherSvc := CreateLoadBalancerService(otherServiceName, true)
+
+			DeferCleanup(th.DeleteInstance, svc)
+			DeferCleanup(th.DeleteInstance, otherSvc)
+			DeferCleanup(th.DeleteInstance, instance)
+		})
+
+		It("drops the CNAMEs instead of producing an entry with more than one canonical hostname", func() {
+			Eventually(func(g Gomega) {
+				dnsdata := GetDNSData(svcDNSData)
+				g.Expect(dnsdata).To(Not(BeNil()))
+				g.Expect(dnsdata.Spec.Hosts).To(HaveLen(1))
+				g.Expect(dnsdata.Spec.Hosts[0].Hostnames).To(ConsistOf(
+					fmt.Sprintf("some-service.%s.svc", namespace),
+					fmt.Sprintf("other-service.%s.svc", namespace)))
+				g.Expect(dnsdata.Spec.Hosts[0].CNAMEs).To(BeEmpty())
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
 	When("A Service is created without dnsmasq annotation", func() {
 		BeforeEach(func() {
 			instance := CreateDNSMasq(namespace, GetDefaultDNSMasqSpec())

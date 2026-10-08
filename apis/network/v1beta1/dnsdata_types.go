@@ -31,6 +31,12 @@ type DNSHost struct {
 	// +kubebuilder:validation:Required
 	// Hostnames for the IP address.
 	Hostnames []string `json:"hostnames"`
+
+	// +kubebuilder:validation:Optional
+	// CNAMEs are additional hostnames registered as DNS aliases (dnsmasq `cname=`
+	// records) of the first entry in Hostnames, instead of duplicate host-file
+	// entries. Requires exactly one entry in Hostnames (the canonical name).
+	CNAMEs []string `json:"cnames,omitempty"`
 }
 
 // DNSDataSpec defines the desired state of DNSData
